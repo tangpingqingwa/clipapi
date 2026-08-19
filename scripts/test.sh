@@ -13,7 +13,7 @@ fail() {
 }
 
 echo "== contract files =="
-for f in README.md SPEC.md CONTRIBUTING.md scripts/test.sh; do
+for f in README.md SPEC.md BUILD.md CONTRIBUTING.md scripts/test.sh; do
   [[ -f "$f" ]] || fail "missing $f"
   [[ -s "$f" ]] || fail "empty $f"
 done

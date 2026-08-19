@@ -68,7 +68,7 @@ Do not merge with failing or skipped required checks.
 
 On **every** commit that reaches `main`:
 
-1. Required files exist: `README.md`, `SPEC.md`, `CONTRIBUTING.md`, `scripts/test.sh`.
+1. Required files exist: `README.md`, `SPEC.md`, `BUILD.md`, `CONTRIBUTING.md`, `scripts/test.sh`.
 2. `bash scripts/test.sh` exits 0 on a clean checkout with no secrets and no live upstream.
 3. Tests are deterministic. No network to TikTok / Reddit / X / Amazon / Maps / G2 / stores unless the test is explicitly marked integration and skipped by default.
 4. A stranger can clone `main`, run `scripts/test.sh`, and get a green result.
