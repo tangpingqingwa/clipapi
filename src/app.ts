@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { createAppAdapter, type TranscriptAdapter } from "./adapters/index.js";
 import { bootstrapKeyIfEmpty } from "./billing/keys.js";
 import { openDatabase, type ClipApiDb } from "./db.js";
+import { creatorRoutes } from "./http/routes/creators.js";
 import { healthRoutes } from "./http/routes/health.js";
 import { meRoutes } from "./http/routes/me.js";
 import { transcriptRoutes } from "./http/routes/transcript.js";
@@ -34,5 +35,6 @@ export async function buildApp(
   await app.register(healthRoutes);
   await app.register(meRoutes);
   await app.register(transcriptRoutes);
+  await app.register(creatorRoutes);
   return app;
 }

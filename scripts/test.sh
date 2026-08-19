@@ -42,13 +42,18 @@ for f in \
   openapi/openapi.yaml \
   tests/fixtures/captioned.json \
   tests/fixtures/no_caption.json \
-  tests/fixtures/deleted.json
+  tests/fixtures/deleted.json \
+  tests/fixtures/creators/clipapi_fixture.json
 do
   [[ -f "$f" ]] || fail "missing $f"
   [[ -s "$f" ]] || fail "empty $f"
 done
 grep -q '/v1/transcript' openapi/openapi.yaml \
   || fail "openapi.yaml missing GET /v1/transcript"
+grep -q '/v1/creators/{handle}/latest' openapi/openapi.yaml \
+  || fail "openapi.yaml missing GET /v1/creators/{handle}/latest"
+grep -q '/v1/creators/{handle}/videos' openapi/openapi.yaml \
+  || fail "openapi.yaml missing GET /v1/creators/{handle}/videos"
 grep -q 'no_transcript' openapi/openapi.yaml \
   || fail "openapi.yaml missing no_transcript"
 

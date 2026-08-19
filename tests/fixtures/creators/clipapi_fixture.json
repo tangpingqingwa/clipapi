@@ -1,0 +1,36 @@
+{
+  "handle": "clipapi_fixture",
+  "platform": "tiktok",
+  "videos": [
+    {
+      "videoId": "7123456789012345678",
+      "title": "Stop fighting TikTok blocks.",
+      "description": "Recorded caption fixture. Do not invent extra lines.",
+      "author": { "handle": "clipapi_fixture", "id": "user_captioned" },
+      "lengthText": "0:08",
+      "hasCaptions": true,
+      "url": "https://www.tiktok.com/@clipapi_fixture/video/7123456789012345678",
+      "createTime": "2024-04-15T12:00:00.000Z"
+    },
+    {
+      "videoId": "7123456789012345679",
+      "title": "Latest monitor clip",
+      "description": "Second public upload on the fixture handle.",
+      "author": { "handle": "clipapi_fixture", "id": "user_captioned" },
+      "lengthText": "0:12",
+      "hasCaptions": true,
+      "url": "https://www.tiktok.com/@clipapi_fixture/video/7123456789012345679",
+      "createTime": "2024-04-14T12:00:00.000Z"
+    },
+    {
+      "videoId": "7123456789012345680",
+      "title": "Page two clip",
+      "description": "Third public upload for pagination.",
+      "author": { "handle": "clipapi_fixture", "id": "user_captioned" },
+      "lengthText": "0:09",
+      "hasCaptions": false,
+      "url": "https://www.tiktok.com/@clipapi_fixture/video/7123456789012345680",
+      "createTime": "2024-04-13T12:00:00.000Z"
+    }
+  ]
+}

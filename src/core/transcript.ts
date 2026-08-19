@@ -204,7 +204,7 @@ export async function getTranscript(
   const videoId = input.adapter.resolveVideoId(parsed.videoId);
   const cacheKey = transcriptCacheKey(parsed.platform, videoId, parsed.lang);
   const cached = getCacheEntry(input.db, cacheKey);
-  if (cached.hit && cached.kind === "transcript") {
+  if (cached.hit && cached.kind === "body") {
     const data = readCachedTranscript(cached.body);
     if (data !== null) {
       return succeed(input, {

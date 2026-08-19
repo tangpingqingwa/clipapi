@@ -103,7 +103,99 @@ paths:
           $ref: "#/components/responses/Internal"
         "503":
           $ref: "#/components/responses/UpstreamBlocked"
+  /v1/creators/{handle}/latest:
+    get:
+      operationId: getLatestVideos
+      summary: Last public uploads for a creator
+      description: >
+        About 15 most recent public uploads. 0 credits. Cached 5–15 minutes.
+        Handle may include a leading @.
+      parameters:
+        - $ref: "#/components/parameters/CreatorHandle"
+        - $ref: "#/components/parameters/CreatorPlatform"
+      responses:
+        "200":
+          description: Latest public uploads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatorVideosEnvelope"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/CreatorNotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/UpstreamBlocked"
+  /v1/creators/{handle}/videos:
+    get:
+      operationId: listCreatorVideos
+      summary: Paginated public uploads for a creator
+      description: >
+        One credit per page returned. Handle may include a leading @.
+      parameters:
+        - $ref: "#/components/parameters/CreatorHandle"
+        - $ref: "#/components/parameters/CreatorPlatform"
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 10
+      responses:
+        "200":
+          description: One page of public uploads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatorVideosEnvelope"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "404":
+          $ref: "#/components/responses/CreatorNotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/UpstreamBlocked"
 components:
+  parameters:
+    CreatorHandle:
+      name: handle
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Public username, with or without a leading @
+    CreatorPlatform:
+      name: platform
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [tiktok, reels, shorts]
+        default: tiktok
   securitySchemes:
     bearerAuth:
       type: http
@@ -294,6 +386,83 @@ components:
           $ref: "#/components/schemas/MeData"
         meta:
           $ref: "#/components/schemas/SuccessMeta"
+    CreatorVideo:
+      type: object
+      additionalProperties: false
+      required:
+        - videoId
+        - title
+        - description
+        - author
+        - lengthText
+        - hasCaptions
+        - url
+        - createTime
+      properties:
+        videoId:
+          type: string
+        title:
+          type:
+            - string
+            - "null"
+        description:
+          type:
+            - string
+            - "null"
+        author:
+          type: object
+          additionalProperties: false
+          required: [handle, id]
+          properties:
+            handle:
+              type:
+                - string
+                - "null"
+            id:
+              type:
+                - string
+                - "null"
+        lengthText:
+          type:
+            - string
+            - "null"
+        hasCaptions:
+          type:
+            - boolean
+            - "null"
+        url:
+          type: string
+        createTime:
+          type:
+            - string
+            - "null"
+    CreatorVideoPage:
+      type: object
+      additionalProperties: false
+      required: [handle, platform, videos, nextCursor]
+      properties:
+        handle:
+          type: string
+        platform:
+          type: string
+          enum: [tiktok, reels, shorts]
+        videos:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreatorVideo"
+        nextCursor:
+          type:
+            - string
+            - "null"
+    CreatorVideosEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/CreatorVideoPage"
+        meta:
+          $ref: "#/components/schemas/SuccessMeta"
   responses:
     InvalidRequest:
       description: Bad URL or missing parameter
@@ -315,6 +484,12 @@ components:
             $ref: "#/components/schemas/ErrorEnvelope"
     NotFound:
       description: Video deleted or private
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    CreatorNotFound:
+      description: Creator handle unknown or has no public uploads
       content:
         application/json:
           schema:
