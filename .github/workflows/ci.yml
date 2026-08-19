@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Verify contract files
+        run: |
+          set -euo pipefail
+          test -f README.md
+          test -f SPEC.md
+          test -f CONTRIBUTING.md
+          test -f scripts/test.sh
+          test -x scripts/test.sh
+
+      - name: Test
+        run: bash scripts/test.sh

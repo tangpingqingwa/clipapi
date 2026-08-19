@@ -1,6 +1,7 @@
 # ClipAPI
 
 Build contract: [SPEC.md](./SPEC.md).
+How we work: [CONTRIBUTING.md](./CONTRIBUTING.md). `main` stays buildable and testable.
 
 Transcripts, search, and creator archives for short video — TikTok, Instagram Reels, YouTube Shorts — one REST schema, one MCP server.
 
