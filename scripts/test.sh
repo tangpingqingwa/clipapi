@@ -51,6 +51,7 @@ if [[ -f package.json ]]; then
   npx tsc --noEmit
 
   echo "== unit tests =="
+  ls tests/*.test.ts >/dev/null 2>&1 || fail "no unit tests in tests/"
   # Quoted so bash 3.2 does not eat **; Node 22's test runner expands the glob.
   npx tsx --test 'tests/**/*.test.ts'
 fi
