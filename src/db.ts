@@ -1,22 +1,26 @@
 import { mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 
 export type ClipApiDb = import("better-sqlite3").Database;
 
-const Database = createRequire(import.meta.url)("better-sqlite3") as {
-  new (filename?: string | Buffer): ClipApiDb;
-};
+const Database = createRequire(import.meta.url)(
+  "better-sqlite3",
+) as typeof import("better-sqlite3");
 
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "migrations");
+
+type MigrationRow = { id: string };
 
 export function openDatabase(path: string): ClipApiDb {
   if (path !== ":memory:") {
     mkdirSync(dirname(path), { recursive: true });
   }
   const db = new Database(path);
-  db.pragma("journal_mode = WAL");
+  if (path !== ":memory:") {
+    db.pragma("journal_mode = WAL");
+  }
   db.pragma("foreign_keys = ON");
   migrate(db);
   return db;
@@ -31,9 +35,9 @@ export function migrate(db: ClipApiDb): void {
   `);
   const applied = new Set(
     db
-      .prepare("SELECT id FROM schema_migrations")
+      .prepare<[], MigrationRow>("SELECT id FROM schema_migrations")
       .all()
-      .map((row) => (row as { id: string }).id),
+      .map((row) => row.id),
   );
   const insert = db.prepare(
     "INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)",

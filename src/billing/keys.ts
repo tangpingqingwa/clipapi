@@ -49,7 +49,7 @@ export function createKey(
   },
 ): Key {
   const prefix = prefixFromSecret(input.secret);
-  if (!prefix) {
+  if (prefix === null) {
     throw new Error("API key must start with ck_live_ or ck_test_");
   }
   const key: Key = {
@@ -80,12 +80,12 @@ export function lookupKey(db: ClipApiDb, secret: string): Key | null {
     return null;
   }
   const row = db
-    .prepare(
+    .prepare<[string], KeyRow>(
       `SELECT id, prefix, plan, credits, rpm, created_at
        FROM keys WHERE hash = ?`,
     )
-    .get(hashSecret(secret)) as KeyRow | undefined;
-  if (!row) {
+    .get(hashSecret(secret));
+  if (row === undefined) {
     return null;
   }
   return {
@@ -99,7 +99,10 @@ export function lookupKey(db: ClipApiDb, secret: string): Key | null {
 }
 
 export function bootstrapKeyIfEmpty(db: ClipApiDb, secret: string): Key | null {
-  const count = db.prepare("SELECT COUNT(*) AS n FROM keys").get() as { n: number };
+  const count = db.prepare<[], { n: number }>("SELECT COUNT(*) AS n FROM keys").get();
+  if (count === undefined) {
+    throw new Error("failed to count API keys");
+  }
   if (count.n > 0) {
     return lookupKey(db, secret);
   }

@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { DEFAULT_FREE_CREDITS } from "../src/billing/keys.js";
-import { parseListenPort } from "../src/config.js";
+import {
+  createKey,
+  DEFAULT_FREE_CREDITS,
+  hashSecret,
+  lookupKey,
+} from "../src/billing/keys.js";
+import { loadConfig, parseListenPort } from "../src/config.js";
+import { openDatabase } from "../src/db.js";
 import { sendErr, sendOk, httpStatusFor, isRetryable } from "../src/http/envelope.js";
 import { ERROR_CODES, type ErrorCode } from "../src/types.js";
 import { buildApp } from "../src/app.js";
@@ -26,6 +32,42 @@ test("parseListenPort defaults unset and empty to 3000 and rejects out of range"
   assert.throws(() => parseListenPort("0"), /PORT must be an integer/);
   assert.throws(() => parseListenPort("abc"), /PORT must be an integer/);
   assert.throws(() => parseListenPort("70000"), /PORT must be an integer/);
+});
+
+test("loadConfig requires CLIPAPI_DATABASE in production", () => {
+  assert.throws(
+    () => loadConfig({ NODE_ENV: "production" }),
+    /CLIPAPI_DATABASE is required in production/,
+  );
+  const config = loadConfig({
+    NODE_ENV: "production",
+    CLIPAPI_DATABASE: "/tmp/clipapi.sqlite",
+    CLIPAPI_BOOTSTRAP_KEY: "ck_test_dev",
+  });
+  assert.equal(config.databasePath, "/tmp/clipapi.sqlite");
+  assert.equal(config.bootstrapKey, "ck_test_dev");
+});
+
+test("createKey stores a hash and lookupKey finds the row", () => {
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+
+  const secret = "ck_live_unit_fixture";
+  const created = createKey(db, { secret, credits: 7 });
+  const found = lookupKey(db, secret);
+  assert.equal(found?.id, created.id);
+  assert.equal(found?.prefix, "ck_live");
+  assert.equal(found?.credits, 7);
+  assert.equal(lookupKey(db, "ck_live_unknown"), null);
+  assert.equal(lookupKey(db, "not-a-key"), null);
+  assert.throws(() => createKey(db, { secret: "nope" }), /ck_live_|ck_test_/);
+
+  const row = db
+    .prepare<[string], { hash: string }>("SELECT hash FROM keys WHERE id = ?")
+    .get(created.id);
+  assert.ok(row);
+  assert.notEqual(row.hash, secret);
+  assert.equal(row.hash, hashSecret(secret));
 });
 
 test("error codes map to SPEC HTTP status and retryable flags", () => {

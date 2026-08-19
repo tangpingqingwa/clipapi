@@ -57,7 +57,6 @@ export function sendOk<T>(
     data,
     meta: {
       cached: meta.cached,
-      // envelope creditsCharged follows success rule; test keys may skip decrement when CLIPAPI_TEST_KEYS_FREE=1
       creditsCharged: meta.creditsCharged,
       requestId: meta.requestId ?? newRequestId(),
       upstreamMs: meta.upstreamMs,

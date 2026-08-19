@@ -26,8 +26,7 @@ export async function requireAuth(
 ): Promise<void> {
   const key = authenticateRequest(request);
   if (key === null) {
-    sendErr(reply, "unauthorized", "Missing or invalid API key.");
-    return;
+    return sendErr(reply, "unauthorized", "Missing or invalid API key.");
   }
   request.apiKey = key;
 }

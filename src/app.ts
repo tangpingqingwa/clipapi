@@ -21,10 +21,10 @@ export async function buildApp(
     bootstrapKeyIfEmpty(db, options.bootstrapKey);
   }
   app.decorate("db", db);
+  app.decorateRequest("apiKey", undefined);
   if (ownsDb) {
-    app.addHook("onClose", (instance, done) => {
+    app.addHook("onClose", async (instance) => {
       instance.db.close();
-      done();
     });
   }
   await app.register(healthRoutes);
