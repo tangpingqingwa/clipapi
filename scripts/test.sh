@@ -52,7 +52,15 @@ if [[ -f package.json ]]; then
 
   echo "== unit tests =="
   # Quoted so bash 3.2 does not eat **; Node 22's test runner expands the glob.
-  npx tsx --test 'tests/**/*.test.ts'
+  test_log="$(mktemp)"
+  trap 'rm -f "$test_log"' EXIT
+  set +e
+  npx tsx --test --test-reporter spec 'tests/**/*.test.ts' | tee "$test_log"
+  test_status=${PIPESTATUS[0]}
+  set -e
+  [[ $test_status -eq 0 ]] || fail "unit tests failed"
+  grep -Eq 'tests[[:space:]]+[1-9][0-9]*' "$test_log" \
+    || fail "test runner reported 0 tests"
 fi
 
 echo "OK: buildable and testable"
