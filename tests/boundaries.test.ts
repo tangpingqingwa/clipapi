@@ -22,16 +22,7 @@ function walkTs(dir: string): string[] {
 test("HTTP and MCP call core only and never import adapters/tiktok", () => {
   const httpDir = join(ROOT, "src/http");
   const mcpDir = join(ROOT, "src/mcp");
-  const files = [
-    ...walkTs(httpDir),
-    ...walkTs(join(ROOT, "src")).filter((path) => path.includes("/mcp/")),
-  ];
-  // mcp/ is optional until PR 5; still scan if present.
-  try {
-    files.push(...walkTs(mcpDir));
-  } catch {
-    // no MCP yet
-  }
+  const files = [...walkTs(httpDir), ...walkTs(mcpDir)];
   const unique = [...new Set(files)];
   assert.ok(unique.length > 0);
   for (const file of unique) {
@@ -40,6 +31,14 @@ test("HTTP and MCP call core only and never import adapters/tiktok", () => {
       src,
       /adapters\/tiktok/,
       `${file} must not import adapters/tiktok`,
+    );
+  }
+  for (const file of walkTs(mcpDir)) {
+    const src = readFileSync(file, "utf8");
+    assert.doesNotMatch(
+      src,
+      /from ["']\.\.\/adapters\//,
+      `${file} must call core only`,
     );
   }
 });

@@ -1,0 +1,76 @@
+# ClipAPI
+
+> Stop fighting TikTok blocks. One credit, one JSON transcript.
+
+REST + MCP that turns a public short-video URL into timed transcript JSON and lists a creator's public uploads. TikTok only in production. Same envelope on every transport.
+
+## URLs
+
+- REST: https://api.clipapi.dev
+- MCP Streamable HTTP: https://mcp.clipapi.dev/mcp
+- OpenAPI: /openapi/openapi.yaml (also intended at /openapi.json)
+- This file: /llms.txt
+- Server card: /.well-known/mcp/server-card.json
+
+## Auth
+
+```
+Authorization: Bearer ck_live_...
+Authorization: Bearer ck_test_...
+```
+
+Same key space for REST and MCP. No scopes. `ck_test_*` uses recorded fixtures and never hits live TikTok.
+
+## MCP tools
+
+### get_transcript
+
+Maps to `GET /v1/transcript`. **1 credit** on success, including cache hits.
+
+Arguments: `url` and/or `video_id` (one required), optional `platform`, `lang`, `format` (`json`).
+
+Success payload matches REST `GET /v1/transcript`. `data.transcript[]` cues use `start` / `duration` in **seconds** (TranscriptAPI-compatible). Never invent cue lines.
+
+### list_creator_videos
+
+Maps to `GET /v1/creators/{handle}/videos`. **1 credit per page**.
+
+Arguments: `handle` (with or without `@`), optional `platform`, `cursor`, `limit` (1–20, default 10).
+
+### get_latest_videos
+
+Maps to `GET /v1/creators/{handle}/latest`. **0 credits**.
+
+Arguments: `handle`, optional `platform`. Last ~15 public uploads. Cache 5–15 minutes. Do not promise freshness under 60 seconds.
+
+Search is not shipped. There is no `search_clips` tool yet.
+
+## When not to call
+
+- Private, deleted, or login-walled videos — expect `not_found`, never a fabricated transcript.
+- You need the video file, a no-watermark MP4, or slideshow images — we do not host media.
+- You need to post, DM, go live, or use shop — read-only public content only.
+- You need an LLM summary on the hot path — take the transcript JSON and summarize yourself.
+- Reels / Shorts — `unsupported_platform` until they pass soak. Do not advertise them.
+
+## Errors
+
+Same envelope as REST. `creditsCharged` is always 0 on error.
+
+| code | HTTP | retryable |
+|---|---|---|
+| invalid_request | 400 | no |
+| unauthorized | 401 | no |
+| payment_required | 402 | no |
+| not_found | 404 | no |
+| no_transcript | 422 | no |
+| unsupported_platform | 422 | no |
+| rate_limited | 429 | yes |
+| upstream_blocked | 503 | yes |
+| internal | 500 | yes |
+
+Failed / empty / blocked calls cost **0 credits**. Never invent transcript lines on `no_transcript`.
+
+## Credits
+
+Free: 100 once. Monthly $5 / 1,000 successful calls. Success costs 1. Failures cost 0.
