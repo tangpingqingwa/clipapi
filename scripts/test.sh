@@ -79,6 +79,9 @@ for dir in src/http src/mcp; do
     fail "$dir imported adapters/tiktok"
   fi
 done
+if grep -R --include='*.ts' -E "from ['\"].*adapters/" src/mcp >/dev/null 2>&1; then
+  fail "src/mcp must call core only (no adapter imports)"
+fi
 
 if [[ -f package.json ]]; then
   echo "== install =="

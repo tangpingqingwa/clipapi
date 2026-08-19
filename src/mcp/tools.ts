@@ -5,7 +5,7 @@ import {
   isRetryableCode,
   type GetTranscriptInput,
 } from "../core/transcript.js";
-import type { Err, ErrorCode, Ok } from "../types.js";
+import type { CreatorVideoPage, Err, ErrorCode, Ok, Transcript } from "../types.js";
 
 export const GET_TRANSCRIPT_TOOL = "get_transcript" as const;
 export const LIST_CREATOR_VIDEOS_TOOL = "list_creator_videos" as const;
@@ -25,7 +25,7 @@ export type McpToolDefinition = {
   inputSchema: Record<string, unknown>;
 };
 
-export type McpToolOutcome = Ok<unknown> | Err;
+export type McpToolOutcome = Ok<Transcript> | Ok<CreatorVideoPage> | Err;
 
 export type CallMcpToolInput = {
   name: string;
