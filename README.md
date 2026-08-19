@@ -1,5 +1,7 @@
 # ClipAPI
 
+Build contract: [SPEC.md](./SPEC.md).
+
 Transcripts, search, and creator archives for short video — TikTok, Instagram Reels, YouTube Shorts — one REST schema, one MCP server.
 
 This is TranscriptAPI for the format YouTube no longer owns. Sell “stop fighting the blocks,” not “another caption toy.”
