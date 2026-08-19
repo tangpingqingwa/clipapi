@@ -1,0 +1,29 @@
+{
+  "videoId": "7123456789012345678",
+  "shortCodes": ["ZTfixture1"],
+  "adapter": {
+    "ok": true,
+    "transcript": {
+      "platform": "tiktok",
+      "videoId": "7123456789012345678",
+      "canonicalUrl": "https://www.tiktok.com/@clipapi_fixture/video/7123456789012345678",
+      "kind": "video",
+      "language": "en",
+      "durationMs": 8400,
+      "author": {
+        "handle": "clipapi_fixture",
+        "id": "user_captioned"
+      },
+      "metadata": {
+        "description": "Recorded caption fixture. Do not invent extra lines.",
+        "createTime": "2024-04-01T12:00:00.000Z",
+        "musicTitle": "Original sound"
+      },
+      "source": "platform_caption",
+      "transcript": [
+        { "text": "Stop fighting TikTok blocks.", "start": 0.0, "duration": 2.1 },
+        { "text": "One credit, one JSON transcript.", "start": 2.1, "duration": 2.4 }
+      ]
+    }
+  }
+}
