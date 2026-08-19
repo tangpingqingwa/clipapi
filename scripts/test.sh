@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Offline gate for main. Must exit 0 on a clean clone with no secrets.
-# When application code lands, add unit/contract tests here. Do not delete the
-# contract checks. Do not require live third-party networks.
+# Contract checks stay; once package.json exists we also typecheck and run
+# node:test. Do not require live third-party networks.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,5 +36,23 @@ fi
 echo "== markdown is UTF-8 text =="
 file -b --mime-encoding README.md SPEC.md CONTRIBUTING.md | grep -qiE 'utf-8|us-ascii' \
   || fail "docs are not UTF-8/ASCII"
+
+if [[ -f package.json ]]; then
+  echo "== install =="
+  if [[ ! -d node_modules ]]; then
+    if [[ -f package-lock.json ]]; then
+      npm ci
+    else
+      npm install
+    fi
+  fi
+
+  echo "== tsc --noEmit =="
+  npx tsc --noEmit
+
+  echo "== unit tests =="
+  # Quoted so bash 3.2 does not eat **; Node 22's test runner expands the glob.
+  npx tsx --test 'tests/**/*.test.ts'
+fi
 
 echo "OK: buildable and testable"
