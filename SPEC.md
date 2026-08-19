@@ -301,3 +301,21 @@ Launch = M3.
 ```
 
 Adapters must be swappable without changing the public schema. Schema bump = `/v2`.
+
+## 14. Git collaboration (normative)
+
+Development is GitHub trunk-based. **`main` is always cloneable, buildable, and testable.**
+
+| Rule | Requirement |
+|---|---|
+| Integration branch | `main` only. No long-lived `develop`. |
+| How code lands | Pull request into `main`. No direct push. |
+| Required check | GitHub Actions workflow `ci` (job id `ci`) must be green. |
+| Local / CI test | `bash scripts/test.sh` — offline, no production secrets. |
+| Branch names | `feat/` `fix/` `docs/` `chore/` `test/` + short slug. |
+| Merge | Squash. Delete the head branch. |
+| Broken `main` | Treat as an incident. Fix on `fix/…` via PR. |
+
+Full process: [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+Until there is an application binary, `scripts/test.sh` still has to pass: contract files exist, SPEC/CONTRIBUTING agree, no tracked secrets. Adding a server or CLI means **extending** that script with unit/contract tests. Live upstream calls are optional and must not be required for `main` to stay green.
