@@ -1,0 +1,347 @@
+openapi: 3.1.0
+info:
+  title: ClipAPI
+  version: 0.1.0
+  description: >
+    REST contract for timed short-video transcripts. Errors never invent
+    caption lines and never charge credits.
+servers:
+  - url: https://api.clipapi.dev
+    description: Production placeholder
+paths:
+  /healthz:
+    get:
+      operationId: healthz
+      summary: Liveness
+      security: []
+      responses:
+        "200":
+          description: Process is up
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+  /v1/me:
+    get:
+      operationId: getMe
+      summary: Current key, plan, and remaining credits
+      responses:
+        "200":
+          description: Key status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/transcript:
+    get:
+      operationId: getTranscript
+      summary: Timed transcript for a public short video
+      description: >
+        One credit on success, including cache hits. Failures and empty
+        caption tracks charge 0 credits and never invent cue lines.
+      parameters:
+        - name: url
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+          description: Official TikTok share URL
+        - name: video_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Numeric TikTok video id
+        - name: platform
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [tiktok, reels, shorts]
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+          description: BCP-47 preference
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [json]
+            default: json
+      responses:
+        "200":
+          description: Transcript with at least one cue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptEnvelope"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/Internal"
+        "503":
+          $ref: "#/components/responses/UpstreamBlocked"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API key
+      description: ck_live_... or ck_test_...
+  schemas:
+    ErrorCode:
+      type: string
+      enum:
+        - invalid_request
+        - unauthorized
+        - payment_required
+        - not_found
+        - no_transcript
+        - unsupported_platform
+        - rate_limited
+        - upstream_blocked
+        - internal
+    ErrorBody:
+      type: object
+      additionalProperties: false
+      required: [code, message, retryable]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+        retryable:
+          type: boolean
+    ErrorMeta:
+      type: object
+      additionalProperties: false
+      required: [creditsCharged, requestId]
+      properties:
+        creditsCharged:
+          type: integer
+          const: 0
+        requestId:
+          type: string
+          pattern: "^req_"
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error, meta]
+      properties:
+        error:
+          $ref: "#/components/schemas/ErrorBody"
+        meta:
+          $ref: "#/components/schemas/ErrorMeta"
+    SuccessMeta:
+      type: object
+      additionalProperties: false
+      required: [cached, creditsCharged, requestId, upstreamMs]
+      properties:
+        cached:
+          type: boolean
+        creditsCharged:
+          type: integer
+          minimum: 0
+        requestId:
+          type: string
+          pattern: "^req_"
+        upstreamMs:
+          type: integer
+          minimum: 0
+    Cue:
+      type: object
+      additionalProperties: false
+      required: [text, start, duration]
+      properties:
+        text:
+          type: string
+        start:
+          type: number
+          description: Seconds from start of video
+        duration:
+          type:
+            - number
+            - "null"
+    Transcript:
+      type: object
+      additionalProperties: false
+      required:
+        - platform
+        - videoId
+        - canonicalUrl
+        - kind
+        - language
+        - durationMs
+        - author
+        - metadata
+        - source
+        - transcript
+      properties:
+        platform:
+          type: string
+          enum: [tiktok, reels, shorts]
+        videoId:
+          type: string
+        canonicalUrl:
+          type: string
+        kind:
+          type: string
+          enum: [video, slideshow, unknown]
+        language:
+          type: string
+        durationMs:
+          type:
+            - number
+            - "null"
+        author:
+          type: object
+          additionalProperties: false
+          required: [handle, id]
+          properties:
+            handle:
+              type:
+                - string
+                - "null"
+            id:
+              type:
+                - string
+                - "null"
+        metadata:
+          type: object
+          additionalProperties: false
+          required: [description, createTime, musicTitle]
+          properties:
+            description:
+              type:
+                - string
+                - "null"
+            createTime:
+              type:
+                - string
+                - "null"
+            musicTitle:
+              type:
+                - string
+                - "null"
+        source:
+          type: string
+          enum: [platform_caption, platform_asr, on_screen]
+        transcript:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Cue"
+    TranscriptEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/Transcript"
+        meta:
+          $ref: "#/components/schemas/SuccessMeta"
+    MeData:
+      type: object
+      additionalProperties: false
+      required: [key, plan, creditsRemaining, rpm]
+      properties:
+        key:
+          type: object
+          additionalProperties: false
+          required: [id, prefix]
+          properties:
+            id:
+              type: string
+            prefix:
+              type: string
+              enum: [ck_live, ck_test]
+        plan:
+          type: string
+        creditsRemaining:
+          type: integer
+          minimum: 0
+        rpm:
+          type: integer
+          minimum: 0
+    MeEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/MeData"
+        meta:
+          $ref: "#/components/schemas/SuccessMeta"
+  responses:
+    InvalidRequest:
+      description: Bad URL or missing parameter
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    PaymentRequired:
+      description: Out of credits
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: Video deleted or private
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Unprocessable:
+      description: No public caption track, or unsupported platform
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    RateLimited:
+      description: RPM exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Internal:
+      description: Server bug
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    UpstreamBlocked:
+      description: Captcha, ban, or geo block
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+security:
+  - bearerAuth: []

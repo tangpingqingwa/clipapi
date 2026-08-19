@@ -37,6 +37,28 @@ echo "== markdown is UTF-8 text =="
 file -b --mime-encoding README.md SPEC.md CONTRIBUTING.md | grep -qiE 'utf-8|us-ascii' \
   || fail "docs are not UTF-8/ASCII"
 
+echo "== transcript fixtures and OpenAPI =="
+for f in \
+  openapi/openapi.yaml \
+  tests/fixtures/captioned.json \
+  tests/fixtures/no_caption.json \
+  tests/fixtures/deleted.json
+do
+  [[ -f "$f" ]] || fail "missing $f"
+  [[ -s "$f" ]] || fail "empty $f"
+done
+grep -q '/v1/transcript' openapi/openapi.yaml \
+  || fail "openapi.yaml missing GET /v1/transcript"
+grep -q 'no_transcript' openapi/openapi.yaml \
+  || fail "openapi.yaml missing no_transcript"
+
+echo "== HTTP/MCP do not import adapters/tiktok =="
+for dir in src/http src/mcp; do
+  if [[ -d "$dir" ]] && grep -R --include='*.ts' -l 'adapters/tiktok' "$dir" >/dev/null 2>&1; then
+    fail "$dir imported adapters/tiktok"
+  fi
+done
+
 if [[ -f package.json ]]; then
   echo "== install =="
   if [[ ! -d node_modules ]]; then
@@ -52,6 +74,8 @@ if [[ -f package.json ]]; then
 
   echo "== unit tests =="
   # Quoted so bash 3.2 does not eat **; Node 22's test runner expands the glob.
+  # Fixture adapter only — never hit live TikTok.
+  export CLIPAPI_FIXTURE_ONLY=1
   test_log="$(mktemp)"
   trap 'rm -f "$test_log"' EXIT
   set +e
