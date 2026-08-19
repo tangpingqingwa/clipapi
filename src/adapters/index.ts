@@ -7,12 +7,15 @@ export type {
   AdapterOk,
   AdapterRequest,
   AdapterResult,
+  CreatorListOk,
+  CreatorListRequest,
+  CreatorListResult,
   TranscriptAdapter,
 } from "./types.js";
 export { createFixtureAdapter } from "./tiktok/fixture.js";
 export { createLiveTikTokAdapter } from "./tiktok/index.js";
 
-/** PR 3 always returns the fixture adapter. Live TikTok is a later PR. */
+/** Unit tests and CI always use the fixture adapter. Live TikTok is a later PR. */
 export function createAppAdapter(): TranscriptAdapter {
   return createFixtureAdapter();
 }

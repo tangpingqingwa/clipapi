@@ -51,3 +51,21 @@ export type Err = {
   error: { code: ErrorCode; message: string; retryable: boolean };
   meta: { creditsCharged: 0; requestId: string };
 };
+
+export type CreatorVideo = {
+  videoId: string;
+  title: string | null;
+  description: string | null;
+  author: { handle: string | null; id: string | null };
+  lengthText: string | null;
+  hasCaptions: boolean | null;
+  url: string;
+  createTime: string | null;
+};
+
+export type CreatorVideoPage = {
+  handle: string;
+  platform: Platform;
+  videos: CreatorVideo[];
+  nextCursor: string | null;
+};

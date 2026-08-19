@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ClipApiDb } from "../db.js";
 
 export const TRANSCRIPT_CREDIT_COST = 1;
+export const CREATOR_PAGE_CREDIT_COST = 1;
 
 export type ChargeInput = {
   keyId: string;

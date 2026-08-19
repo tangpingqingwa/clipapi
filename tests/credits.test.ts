@@ -77,6 +77,9 @@ test("success charges 1; 422/404/503 never decrement", async () => {
     async fetchTranscript(): Promise<AdapterResult> {
       return { ok: false, code: "upstream_blocked" };
     },
+    async listCreatorVideos() {
+      return { ok: false, code: "upstream_blocked" };
+    },
   };
 
   const { app, db, key } = await appWith(10);
@@ -132,6 +135,9 @@ test("empty caption array from adapter is no_transcript and is not charged", asy
   const empty: TranscriptAdapter = {
     resolveVideoId(ref) {
       return ref;
+    },
+    async listCreatorVideos() {
+      return { ok: false, code: "not_found" };
     },
     async fetchTranscript(request: AdapterRequest): Promise<AdapterResult> {
       return {

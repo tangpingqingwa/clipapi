@@ -71,10 +71,14 @@ function assertTranscriptEnvelope(body: unknown): Transcript {
   return data;
 }
 
-test("openapi.yaml documents transcript and every SPEC error code", () => {
+test("openapi.yaml documents transcript, creators, and every SPEC error code", () => {
   const spec = loadOpenApi();
   assert.match(spec, /\/v1\/transcript/);
   assert.match(spec, /operationId: getTranscript/);
+  assert.match(spec, /\/v1\/creators\/\{handle\}\/latest/);
+  assert.match(spec, /\/v1\/creators\/\{handle\}\/videos/);
+  assert.match(spec, /operationId: getLatestVideos/);
+  assert.match(spec, /operationId: listCreatorVideos/);
   for (const code of ERROR_CODES) {
     assert.match(spec, new RegExp(`- ${code}`));
   }
@@ -134,4 +138,30 @@ test("fixture HTTP responses satisfy the documented envelope", async () => {
   });
   assert.equal(unauth.statusCode, 401);
   assertErrorEnvelope(unauth.json(), "unauthorized");
+
+  const latest = await app.inject({
+    method: "GET",
+    url: "/v1/creators/clipapi_fixture/latest",
+    headers,
+  });
+  assert.equal(latest.statusCode, 200);
+  assertCreatorEnvelope(latest.json(), 0);
+
+  const videos = await app.inject({
+    method: "GET",
+    url: "/v1/creators/clipapi_fixture/videos",
+    headers,
+  });
+  assert.equal(videos.statusCode, 200);
+  assertCreatorEnvelope(videos.json(), 1);
 });
+
+function assertCreatorEnvelope(body: unknown, creditsCharged: number): void {
+  assert.ok(isRecord(body));
+  assert.ok(isRecord(body.data));
+  assert.ok(isRecord(body.meta));
+  assert.ok(Array.isArray(body.data.videos));
+  assert.ok((body.data.videos as unknown[]).length >= 1);
+  assert.equal(body.meta.creditsCharged, creditsCharged);
+  assert.match(String(body.meta.requestId), /^req_/);
+}

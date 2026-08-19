@@ -1,10 +1,17 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Cue, Platform, Transcript } from "../../types.js";
+import type {
+  CreatorVideo,
+  CreatorVideoPage,
+  Cue,
+  Platform,
+  Transcript,
+} from "../../types.js";
 import type {
   AdapterFailureCode,
   AdapterResult,
+  CreatorListResult,
   TranscriptAdapter,
 } from "../types.js";
 
@@ -26,9 +33,16 @@ type FixtureFile = {
   adapter: AdapterResult;
 };
 
+type CreatorCatalog = {
+  handle: string;
+  platform: Platform;
+  videos: CreatorVideo[];
+};
+
 type FixtureIndex = {
   byId: Map<string, AdapterResult>;
   byShort: Map<string, string>;
+  byHandle: Map<string, CreatorCatalog>;
 };
 
 export type FixtureAdapterOptions = {
@@ -47,12 +61,37 @@ export function createFixtureAdapter(
       const videoId = index.byShort.get(request.videoId) ?? request.videoId;
       return index.byId.get(videoId) ?? { ok: false, code: "not_found" };
     },
+    async listCreatorVideos(request): Promise<CreatorListResult> {
+      const handle = normalizeHandle(request.handle);
+      const catalog = index.byHandle.get(handle);
+      if (catalog === undefined) {
+        return { ok: false, code: "not_found" };
+      }
+      if (request.platform !== catalog.platform) {
+        return { ok: false, code: "unsupported_platform" };
+      }
+      const start = parseOffsetCursor(request.cursor);
+      if (start === null) {
+        return { ok: false, code: "not_found" };
+      }
+      const videos = catalog.videos.slice(start, start + request.limit);
+      const nextOffset = start + request.limit;
+      const page: CreatorVideoPage = {
+        handle: catalog.handle,
+        platform: catalog.platform,
+        videos,
+        nextCursor:
+          nextOffset < catalog.videos.length ? String(nextOffset) : null,
+      };
+      return { ok: true, page };
+    },
   };
 }
 
 export function loadFixtureIndex(dir: string): FixtureIndex {
   const byId = new Map<string, AdapterResult>();
   const byShort = new Map<string, string>();
+  const byHandle = new Map<string, CreatorCatalog>();
   const files = readdirSync(dir)
     .filter((name) => name.endsWith(".json"))
     .sort();
@@ -69,7 +108,39 @@ export function loadFixtureIndex(dir: string): FixtureIndex {
       byShort.set(code, parsed.videoId);
     }
   }
-  return { byId, byShort };
+  const creatorsDir = join(dir, "creators");
+  try {
+    const creatorFiles = readdirSync(creatorsDir)
+      .filter((name) => name.endsWith(".json"))
+      .sort();
+    for (const file of creatorFiles) {
+      const catalog = parseCreatorFixture(join(creatorsDir, file), file);
+      const key = normalizeHandle(catalog.handle);
+      if (byHandle.has(key)) {
+        throw new Error(`duplicate creator handle ${catalog.handle} in ${file}`);
+      }
+      byHandle.set(key, catalog);
+    }
+  } catch (err) {
+    if (!isNodeErrno(err) || err.code !== "ENOENT") {
+      throw err;
+    }
+  }
+  return { byId, byShort, byHandle };
+}
+
+export function normalizeHandle(handle: string): string {
+  return handle.trim().replace(/^@+/, "").toLowerCase();
+}
+
+function parseOffsetCursor(cursor: string | undefined): number | null {
+  if (cursor === undefined || cursor === "") {
+    return 0;
+  }
+  if (!/^\d+$/.test(cursor)) {
+    return null;
+  }
+  return Number(cursor);
 }
 
 function parseFixtureFile(path: string, file: string): FixtureFile {
@@ -204,6 +275,84 @@ function parseCue(value: unknown, file: string, index: number): Cue {
     start: value.start,
     duration: value.duration,
   };
+}
+
+function parseCreatorFixture(path: string, file: string): CreatorCatalog {
+  const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
+  if (!isRecord(raw)) {
+    throw new Error(`creator fixture ${file} must be an object`);
+  }
+  if (typeof raw.handle !== "string" || normalizeHandle(raw.handle) === "") {
+    throw new Error(`creator fixture ${file} is missing handle`);
+  }
+  const platform = raw.platform;
+  if (platform !== "tiktok" && platform !== "reels" && platform !== "shorts") {
+    throw new Error(`creator fixture ${file} has an invalid platform`);
+  }
+  if (!Array.isArray(raw.videos)) {
+    throw new Error(`creator fixture ${file} videos must be an array`);
+  }
+  return {
+    handle: normalizeHandle(raw.handle),
+    platform,
+    videos: raw.videos.map((video, index) =>
+      parseCreatorVideo(video, file, index),
+    ),
+  };
+}
+
+function parseCreatorVideo(
+  value: unknown,
+  file: string,
+  index: number,
+): CreatorVideo {
+  if (!isRecord(value)) {
+    throw new Error(`creator fixture ${file} video ${index} must be an object`);
+  }
+  if (typeof value.videoId !== "string" || value.videoId === "") {
+    throw new Error(`creator fixture ${file} video ${index} videoId is required`);
+  }
+  if (typeof value.url !== "string" || value.url === "") {
+    throw new Error(`creator fixture ${file} video ${index} url is required`);
+  }
+  if (!isRecord(value.author)) {
+    throw new Error(`creator fixture ${file} video ${index} author is required`);
+  }
+  const hasCaptions = value.hasCaptions;
+  if (hasCaptions !== null && typeof hasCaptions !== "boolean") {
+    throw new Error(
+      `creator fixture ${file} video ${index} hasCaptions must be boolean|null`,
+    );
+  }
+  return {
+    videoId: value.videoId,
+    title: asNullableString(value.title, `${file} video ${index} title`),
+    description: asNullableString(
+      value.description,
+      `${file} video ${index} description`,
+    ),
+    author: {
+      handle: asNullableString(
+        value.author.handle,
+        `${file} video ${index} author.handle`,
+      ),
+      id: asNullableString(value.author.id, `${file} video ${index} author.id`),
+    },
+    lengthText: asNullableString(
+      value.lengthText,
+      `${file} video ${index} lengthText`,
+    ),
+    hasCaptions,
+    url: value.url,
+    createTime: asNullableString(
+      value.createTime,
+      `${file} video ${index} createTime`,
+    ),
+  };
+}
+
+function isNodeErrno(err: unknown): err is NodeJS.ErrnoException {
+  return isRecord(err) && typeof err.code === "string";
 }
 
 function asNullableString(value: unknown, label: string): string | null {

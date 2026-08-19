@@ -4,12 +4,14 @@ import type { ErrorCode, Platform } from "../types.js";
 export const TRANSCRIPT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const NOT_FOUND_TTL_MS = 24 * 60 * 60 * 1000;
 export const NO_TRANSCRIPT_TTL_MS = 10 * 60 * 1000;
+export const CREATOR_LIST_TTL_MS = 15 * 60 * 1000;
+export const LATEST_TTL_MS = 10 * 60 * 1000;
 
 export type CacheTombstoneCode = Extract<ErrorCode, "not_found" | "no_transcript">;
 
 export type CacheLookup =
   | { hit: false }
-  | { hit: true; kind: "transcript"; body: string }
+  | { hit: true; kind: "body"; body: string }
   | { hit: true; kind: "tombstone"; errorCode: CacheTombstoneCode };
 
 type CacheRow = {
@@ -27,6 +29,19 @@ export function transcriptCacheKey(
   return `transcript:${platform}:${videoId}:${lang}`;
 }
 
+export function creatorListCacheKey(
+  platform: Platform,
+  handle: string,
+  cursor: string,
+  limit: number,
+): string {
+  return `creator:${platform}:${handle}:${cursor}:${limit}`;
+}
+
+export function latestCacheKey(platform: Platform, handle: string): string {
+  return `latest:${platform}:${handle}`;
+}
+
 export function getCacheEntry(
   db: ClipApiDb,
   cacheKey: string,
@@ -41,8 +56,8 @@ export function getCacheEntry(
   if (row === undefined || row.expires_at <= now.toISOString()) {
     return { hit: false };
   }
-  if (row.kind === "transcript" && row.body !== null) {
-    return { hit: true, kind: "transcript", body: row.body };
+  if ((row.kind === "transcript" || row.kind === "json") && row.body !== null) {
+    return { hit: true, kind: "body", body: row.body };
   }
   if (
     row.kind === "tombstone" &&
@@ -60,9 +75,30 @@ export function setTranscriptCache(
   now: Date = new Date(),
   ttlMs: number = TRANSCRIPT_TTL_MS,
 ): void {
+  setCacheBody(db, cacheKey, body, now, ttlMs, "transcript");
+}
+
+export function setJsonCache(
+  db: ClipApiDb,
+  cacheKey: string,
+  body: string,
+  now: Date = new Date(),
+  ttlMs: number,
+): void {
+  setCacheBody(db, cacheKey, body, now, ttlMs, "json");
+}
+
+function setCacheBody(
+  db: ClipApiDb,
+  cacheKey: string,
+  body: string,
+  now: Date,
+  ttlMs: number,
+  kind: "transcript" | "json",
+): void {
   upsertCache(db, {
     cacheKey,
-    kind: "transcript",
+    kind,
     body,
     errorCode: null,
     expiresAt: new Date(now.getTime() + ttlMs).toISOString(),

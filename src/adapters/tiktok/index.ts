@@ -12,5 +12,8 @@ export function createLiveTikTokAdapter(): TranscriptAdapter {
     async fetchTranscript(): Promise<AdapterResult> {
       return { ok: false, code: "upstream_blocked" };
     },
+    async listCreatorVideos() {
+      return { ok: false, code: "upstream_blocked" as const };
+    },
   };
 }
