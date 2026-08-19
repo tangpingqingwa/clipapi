@@ -13,7 +13,7 @@ fail() {
 }
 
 echo "== contract files =="
-for f in README.md SPEC.md BUILD.md CONTRIBUTING.md scripts/test.sh; do
+for f in README.md SPEC.md BUILD.md CONTRIBUTING.md scripts/test.sh llms.txt; do
   [[ -f "$f" ]] || fail "missing $f"
   [[ -s "$f" ]] || fail "empty $f"
 done
@@ -34,7 +34,7 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 echo "== markdown is UTF-8 text =="
-file -b --mime-encoding README.md SPEC.md CONTRIBUTING.md | grep -qiE 'utf-8|us-ascii' \
+file -b --mime-encoding README.md SPEC.md CONTRIBUTING.md llms.txt | grep -qiE 'utf-8|us-ascii' \
   || fail "docs are not UTF-8/ASCII"
 
 echo "== transcript fixtures and OpenAPI =="
@@ -57,12 +57,31 @@ grep -q '/v1/creators/{handle}/videos' openapi/openapi.yaml \
 grep -q 'no_transcript' openapi/openapi.yaml \
   || fail "openapi.yaml missing no_transcript"
 
+echo "== llms.txt + MCP tools =="
+[[ -f src/mcp/server.ts ]] || fail "missing src/mcp/server.ts"
+[[ -f src/mcp/tools.ts ]] || fail "missing src/mcp/tools.ts"
+[[ -f tests/mcp.test.ts ]] || fail "missing tests/mcp.test.ts"
+grep -q 'get_transcript' llms.txt || fail "llms.txt missing get_transcript"
+grep -q 'When not to call' llms.txt || fail "llms.txt missing when-not-to-call"
+if grep -q 'search_clips' src/mcp/tools.ts; then
+  fail "src/mcp/tools.ts must not ship search (PR 6)"
+fi
+if grep -R --include='*.ts' -E "from ['\"]stripe['\"]|STRIPE_" src/mcp >/dev/null 2>&1; then
+  fail "src/mcp must not import Stripe (PR 7)"
+fi
+if grep -R --include='*.ts' -E 'fetch\s*\(|https?://www\.tiktok\.com/api/' src/mcp >/dev/null 2>&1; then
+  fail "src/mcp must not call live TikTok"
+fi
+
 echo "== HTTP/MCP do not import adapters/tiktok =="
 for dir in src/http src/mcp; do
   if [[ -d "$dir" ]] && grep -R --include='*.ts' -l 'adapters/tiktok' "$dir" >/dev/null 2>&1; then
     fail "$dir imported adapters/tiktok"
   fi
 done
+if grep -R --include='*.ts' -E "from ['\"].*adapters/" src/mcp >/dev/null 2>&1; then
+  fail "src/mcp must call core only (no adapter imports)"
+fi
 
 if [[ -f package.json ]]; then
   echo "== install =="
