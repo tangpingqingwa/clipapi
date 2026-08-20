@@ -1,0 +1,18 @@
+{
+  "id": "evt_test_invoice_failed",
+  "object": "event",
+  "type": "invoice.payment_failed",
+  "data": {
+    "object": {
+      "id": "in_test_failed",
+      "object": "invoice",
+      "customer": "cus_test_monthly",
+      "subscription": "sub_test_monthly",
+      "amount_due": 500,
+      "currency": "usd",
+      "metadata": {
+        "keyId": "key_stripe_fixture"
+      }
+    }
+  }
+}

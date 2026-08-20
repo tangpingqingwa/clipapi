@@ -10,6 +10,7 @@ declare module "fastify" {
 
   interface FastifyRequest {
     apiKey?: Key;
+    stripeRawBody?: string;
   }
 }
 

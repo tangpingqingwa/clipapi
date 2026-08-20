@@ -289,7 +289,9 @@ CREATE TABLE cache_entries (
 | `CLIPAPI_FIXTURE_ONLY` | no | `0`. `1` in CI / `scripts/test.sh` — adapter is fixture |
 | `CLIPAPI_LIVE` | no | `0`. `1` selects the live TikTok `TranscriptAdapter`. Ignored when `CLIPAPI_FIXTURE_ONLY=1`. |
 | `CLIPAPI_BOOTSTRAP_KEY` | no | if set, insert this live key on empty DB (dev only) |
-| `STRIPE_SECRET` | M2+ | |
+| `STRIPE_SECRET` | M2+ | unused until a live client exists; checkout fails closed without an injected `StripePort` |
+| `STRIPE_WEBHOOK_SECRET` | M2+ | HMAC for `POST /v1/billing/webhook`. Missing/invalid signature → 400 |
+| `PUBLIC_BASE_URL` | no | `http://localhost:3000`. Checkout success/cancel origin |
 
 `.env` is gitignored. Never read in unit tests.
 
