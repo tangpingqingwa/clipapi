@@ -46,6 +46,22 @@ test("loadConfig requires CLIPAPI_DATABASE in production", () => {
   });
   assert.equal(config.databasePath, "/tmp/clipapi.sqlite");
   assert.equal(config.bootstrapKey, "ck_test_dev");
+  assert.equal(config.fixtureOnly, false);
+  assert.equal(config.liveTikTok, false);
+
+  const live = loadConfig({
+    CLIPAPI_DATABASE: "/tmp/clipapi.sqlite",
+    CLIPAPI_LIVE: "1",
+  });
+  assert.equal(live.liveTikTok, true);
+  assert.equal(live.fixtureOnly, false);
+
+  const ci = loadConfig({
+    CLIPAPI_LIVE: "1",
+    CLIPAPI_FIXTURE_ONLY: "1",
+  });
+  assert.equal(ci.fixtureOnly, true);
+  assert.equal(ci.liveTikTok, false);
 });
 
 test("createKey stores a hash and lookupKey finds the row", () => {

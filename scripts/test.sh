@@ -43,7 +43,12 @@ for f in \
   tests/fixtures/captioned.json \
   tests/fixtures/no_caption.json \
   tests/fixtures/deleted.json \
-  tests/fixtures/creators/clipapi_fixture.json
+  tests/fixtures/creators/clipapi_fixture.json \
+  tests/fixtures/html/captioned.html \
+  tests/fixtures/html/no_caption.html \
+  tests/fixtures/html/deleted.html \
+  tests/fixtures/html/blocked.html \
+  tests/fixtures/html/captioned.vtt
 do
   [[ -f "$f" ]] || fail "missing $f"
   [[ -s "$f" ]] || fail "empty $f"
@@ -73,6 +78,19 @@ if grep -R --include='*.ts' -E 'fetch\s*\(|https?://www\.tiktok\.com/api/' src/m
   fail "src/mcp must not call live TikTok"
 fi
 
+echo "== live TikTok adapter is env-gated and offline-tested =="
+[[ -f src/adapters/tiktok/parse.ts ]] || fail "missing src/adapters/tiktok/parse.ts"
+[[ -f tests/tiktok-parse.test.ts ]] || fail "missing tests/tiktok-parse.test.ts"
+[[ -f tests/tiktok-live.test.ts ]] || fail "missing tests/tiktok-live.test.ts"
+grep -q 'CLIPAPI_LIVE' src/config.ts || fail "src/config.ts missing CLIPAPI_LIVE"
+grep -q 'CLIPAPI_FIXTURE_ONLY' src/config.ts || fail "src/config.ts missing CLIPAPI_FIXTURE_ONLY"
+grep -q 'createLiveTikTokAdapter' src/adapters/index.ts \
+  || fail "createAppAdapter must know about the live adapter"
+# Real-network tests belong in tests/live/ and are never invoked here.
+if [[ -d tests/live ]]; then
+  echo "note: tests/live/ is present and skipped (offline gate)"
+fi
+
 echo "== HTTP/MCP do not import adapters/tiktok =="
 for dir in src/http src/mcp; do
   if [[ -d "$dir" ]] && grep -R --include='*.ts' -l 'adapters/tiktok' "$dir" >/dev/null 2>&1; then
@@ -98,8 +116,10 @@ if [[ -f package.json ]]; then
 
   echo "== unit tests =="
   # Quoted so bash 3.2 does not eat **; Node 22's test runner expands the glob.
-  # Fixture adapter only — never hit live TikTok.
+  # Fixture adapter only — never hit live TikTok. CLIPAPI_FIXTURE_ONLY wins over CLIPAPI_LIVE.
+  unset CLIPAPI_LIVE || true
   export CLIPAPI_FIXTURE_ONLY=1
+  [[ "${CLIPAPI_LIVE:-}" != "1" ]] || fail "CLIPAPI_LIVE must stay unset in test.sh"
   test_log="$(mktemp)"
   trap 'rm -f "$test_log"' EXIT
   set +e

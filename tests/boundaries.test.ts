@@ -50,6 +50,7 @@ test("no live TikTok hosts are fetched from src or tests", () => {
   ];
   for (const file of files) {
     const src = readFileSync(file, "utf8");
+    // Adapter may assemble TikTok page URLs; never hard-code fetch of a TikTok host literal.
     assert.doesNotMatch(src, /\bfetch\s*\(\s*['"`]https?:\/\/[^'"`]*tiktok/i, file);
     assert.doesNotMatch(src, /https?:\/\/www\.tiktok\.com\/api\//, file);
   }

@@ -122,8 +122,9 @@ clipapi/
     adapters/
       types.ts             TranscriptAdapter
       tiktok/
-        index.ts           live (not called in unit tests)
-        fixture.ts         recorded HTML/JSON → Transcript
+        index.ts           live (CLIPAPI_LIVE=1; not called in CI)
+        parse.ts           HTML / VTT / caption JSON → Transcript
+        fixture.ts         recorded JSON fixtures → Transcript
     mcp/
       server.ts
       tools.ts
@@ -285,7 +286,8 @@ CREATE TABLE cache_entries (
 |---|---|---|
 | `PORT` | no | 3000 |
 | `CLIPAPI_DATABASE` | yes in prod | `./data/clipapi.sqlite` |
-| `CLIPAPI_FIXTURE_ONLY` | no | `0`. `1` in CI — adapter is fixture |
+| `CLIPAPI_FIXTURE_ONLY` | no | `0`. `1` in CI / `scripts/test.sh` — adapter is fixture |
+| `CLIPAPI_LIVE` | no | `0`. `1` selects the live TikTok `TranscriptAdapter`. Ignored when `CLIPAPI_FIXTURE_ONLY=1`. |
 | `CLIPAPI_BOOTSTRAP_KEY` | no | if set, insert this live key on empty DB (dev only) |
 | `STRIPE_SECRET` | M2+ | |
 
@@ -311,7 +313,7 @@ CREATE TABLE cache_entries (
 | `parse-url.test.ts` | vm.tiktok, www, video id only |
 | `scripts/test.sh` | existing contract checks **plus** `npx tsc --noEmit` and `npx tsx --test tests/**/*.test.ts` once package.json exists |
 
-Live TikTok is **not** in CI. Optional `tests/live/` gated on `CLIPAPI_LIVE=1`.
+Live TikTok is **not** in CI. Parsing tests use checked-in HTML under `tests/fixtures/html/`. Optional `tests/live/` (real network) stays gated on `CLIPAPI_LIVE=1` and is not run by `scripts/test.sh`.
 
 ---
 
@@ -379,13 +381,13 @@ Each PR is independently mergeable. Dependencies are hard.
 
 ---
 
-## 12. Implementation notes for the TikTok adapter (PR 3 live path, later PR)
+## 12. Implementation notes for the TikTok adapter (live path)
 
-- Live adapter is a separate follow-up PR after fixture path is on `main`.
-- It must implement `TranscriptAdapter` only.
+- Live adapter implements `TranscriptAdapter` only (`src/adapters/tiktok/index.ts`). Default remains the fixture adapter.
 - Failures map to the ErrorCode union — no raw exceptions across the core boundary.
 - User-Agent + timeout 8s + one retry on 502/503 only.
 - Parsing tests use checked-in HTML snippets, not live fetches.
+- `CLIPAPI_LIVE=1` opts in; `CLIPAPI_FIXTURE_ONLY=1` always wins (CI / `scripts/test.sh`).
 
 ---
 
