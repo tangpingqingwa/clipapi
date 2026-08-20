@@ -1,4 +1,4 @@
-import type { Cue, Transcript } from "../../types.js";
+import type { CreatorVideo, CreatorVideoPage, Cue, Transcript } from "../../types.js";
 import type { AdapterFailureCode } from "../types.js";
 
 export type ParsedVideoPageOk = {
@@ -28,6 +28,11 @@ const DELETED_RE =
   /video currently unavailable|couldn['’]t find this video|video is unavailable|this video is private/i;
 
 const NOT_FOUND_STATUS = new Set([10204, 10215, 10216, 10217]);
+const CREATOR_NOT_FOUND_STATUS = new Set([10202, 10204, 10215, 10216, 10217, 10221]);
+
+export type ParsedCreatorPage =
+  | { ok: true; page: CreatorVideoPage }
+  | { ok: false; code: AdapterFailureCode };
 
 export function parseTikTokVideoPage(
   html: string,
@@ -57,6 +62,39 @@ export function parseTikTokVideoPage(
   if (DELETED_RE.test(html)) {
     return { ok: false, code: "not_found" };
   }
+  return { ok: false, code: "upstream_blocked" };
+}
+
+/**
+ * Public creator profile HTML → video page. Empty `itemList` is a real empty
+ * page, not invented uploads. Unknown / banned handles are `not_found`.
+ */
+export function parseTikTokCreatorPage(
+  html: string,
+  handle: string,
+  cursor?: string,
+  limit = 15,
+): ParsedCreatorPage {
+  if (BLOCKED_RE.test(html)) {
+    return { ok: false, code: "upstream_blocked" };
+  }
+
+  const universal = parseJsonObject(firstGroup(UNIVERSAL_SCRIPT_RE, html));
+  if (universal !== null) {
+    const parsed = parseUniversalCreator(universal, handle, cursor, limit);
+    if (parsed !== null) {
+      return parsed;
+    }
+  }
+
+  const sigi = parseJsonObject(firstGroup(SIGI_SCRIPT_RE, html));
+  if (sigi !== null) {
+    const parsed = parseSigiCreator(sigi, handle, cursor, limit);
+    if (parsed !== null) {
+      return parsed;
+    }
+  }
+
   return { ok: false, code: "upstream_blocked" };
 }
 
@@ -117,6 +155,178 @@ function parseUniversalData(
     return { ok: false, code: "not_found" };
   }
   return itemToPage(item, videoId, lang);
+}
+
+function parseUniversalCreator(
+  data: Record<string, unknown>,
+  requestedHandle: string,
+  cursor: string | undefined,
+  limit: number,
+): ParsedCreatorPage | null {
+  const scope = asRecord(data["__DEFAULT_SCOPE__"]);
+  if (scope === null) {
+    return null;
+  }
+  const detail = asRecord(scope["webapp.user-detail"]);
+  if (detail === null) {
+    return null;
+  }
+  const statusCode = detail.statusCode;
+  if (typeof statusCode === "number" && CREATOR_NOT_FOUND_STATUS.has(statusCode)) {
+    return { ok: false, code: "not_found" };
+  }
+  const userInfo = asRecord(detail.userInfo);
+  if (userInfo === null) {
+    return typeof statusCode === "number" && statusCode !== 0
+      ? { ok: false, code: "not_found" }
+      : null;
+  }
+  const user = asRecord(userInfo.user);
+  if (user === null) {
+    return { ok: false, code: "not_found" };
+  }
+  const handle =
+    readString(user, "uniqueId", "unique_id", "handle") ?? requestedHandle;
+  const authorId = readString(user, "id") ?? null;
+  const items = collectCreatorItems(userInfo.itemList ?? userInfo.items);
+  return paginateCreatorItems(handle, authorId, items, cursor, limit);
+}
+
+function parseSigiCreator(
+  data: Record<string, unknown>,
+  requestedHandle: string,
+  cursor: string | undefined,
+  limit: number,
+): ParsedCreatorPage | null {
+  const userModule = asRecord(data.UserModule);
+  const users = userModule === null ? null : asRecord(userModule.users) ?? userModule;
+  let handle = requestedHandle;
+  let authorId: string | null = null;
+  if (users !== null) {
+    const direct = asRecord(users[requestedHandle]);
+    const firstKey = Object.keys(users)[0];
+    const first = firstKey === undefined ? null : asRecord(users[firstKey]);
+    const chosen = direct ?? first;
+    if (chosen !== null) {
+      handle = readString(chosen, "uniqueId", "unique_id", "handle") ?? handle;
+      authorId = readString(chosen, "id") ?? null;
+    }
+  }
+  const itemModule = asRecord(data.ItemModule);
+  if (itemModule === null) {
+    return null;
+  }
+  const items = Object.values(itemModule).flatMap((raw) => {
+    const rec = asRecord(raw);
+    return rec === null ? [] : [creatorVideoFromItem(rec, handle, authorId)];
+  });
+  return paginateCreatorItems(handle, authorId, items, cursor, limit);
+}
+
+function collectCreatorItems(raw: unknown): CreatorVideo[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: CreatorVideo[] = [];
+  for (const entry of raw) {
+    const rec = asRecord(entry);
+    if (rec === null) {
+      continue;
+    }
+    out.push(creatorVideoFromItem(rec, null, null));
+  }
+  return out;
+}
+
+function creatorVideoFromItem(
+  item: Record<string, unknown>,
+  fallbackHandle: string | null,
+  fallbackAuthorId: string | null,
+): CreatorVideo {
+  const videoId = readString(item, "id", "videoId") ?? "";
+  const description = readString(item, "desc", "description", "title") ?? null;
+  const author = readAuthor(item);
+  const handle = author.handle ?? fallbackHandle;
+  const video = asRecord(item.video);
+  const durationMs = readDurationMs(video);
+  const captions = hasCaptionTracks(video);
+  return {
+    videoId,
+    title: description,
+    description,
+    author: {
+      handle,
+      id: author.id ?? fallbackAuthorId,
+    },
+    lengthText: formatLengthText(durationMs),
+    hasCaptions: captions,
+    url:
+      videoId === ""
+        ? `https://www.tiktok.com/@${handle ?? "_"}`
+        : `https://www.tiktok.com/@${handle ?? "_"}/video/${videoId}`,
+    createTime: readCreateTime(item.createTime),
+  };
+}
+
+function hasCaptionTracks(video: Record<string, unknown> | null): boolean | null {
+  if (video === null) {
+    return null;
+  }
+  const refs = readSubtitleRefs(video);
+  if (refs.length > 0) {
+    return true;
+  }
+  const cla = asRecord(video.claInfo);
+  if (cla !== null && Array.isArray(cla.captionInfos)) {
+    return cla.captionInfos.length > 0;
+  }
+  return null;
+}
+
+function formatLengthText(durationMs: number | null): string | null {
+  if (durationMs === null || durationMs < 0) {
+    return null;
+  }
+  const totalSeconds = Math.round(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function paginateCreatorItems(
+  handle: string,
+  _authorId: string | null,
+  items: CreatorVideo[],
+  cursor: string | undefined,
+  limit: number,
+): ParsedCreatorPage {
+  const videos = items.filter((item) => item.videoId !== "");
+  const start = parseOffsetCursor(cursor);
+  if (start === null) {
+    return { ok: false, code: "not_found" };
+  }
+  const pageSize = Number.isInteger(limit) && limit > 0 ? limit : 15;
+  const slice = videos.slice(start, start + pageSize);
+  const nextOffset = start + pageSize;
+  return {
+    ok: true,
+    page: {
+      handle,
+      platform: "tiktok",
+      videos: slice,
+      nextCursor: nextOffset < videos.length ? String(nextOffset) : null,
+    },
+  };
+}
+
+function parseOffsetCursor(cursor: string | undefined): number | null {
+  if (cursor === undefined || cursor === "") {
+    return 0;
+  }
+  if (!/^\d+$/.test(cursor)) {
+    return null;
+  }
+  return Number(cursor);
 }
 
 function parseSigiState(

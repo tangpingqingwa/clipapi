@@ -87,13 +87,13 @@ test("createAppAdapter stays on fixtures by default and when CI sets FIXTURE_ONL
 
   const live = createAppAdapter({ CLIPAPI_LIVE: "1" });
   const creators = await live.listCreatorVideos({
-    platform: "tiktok",
+    platform: "reels",
     handle: "clipapi_fixture",
     limit: 10,
   });
   assert.equal(creators.ok, false);
   if (!creators.ok) {
-    assert.equal(creators.code, "upstream_blocked");
+    assert.equal(creators.code, "unsupported_platform");
   }
 });
 
@@ -266,6 +266,73 @@ test("no-caption and captcha snippets map to SPEC codes; live adapter never thro
       },
     }).fetchTranscript({ platform: "tiktok", videoId: VIDEO_ID });
   });
+});
+
+test("live creator list parses injected profile HTML and does not invent videos", async () => {
+  const listed = await createLiveTikTokAdapter({
+    fetch: async (input) => {
+      const url = String(input);
+      assert.match(url, /tiktok\.com\/@clipapi_fixture$/);
+      return textResponse(`<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__">${JSON.stringify({
+        __DEFAULT_SCOPE__: {
+          "webapp.user-detail": {
+            statusCode: 0,
+            userInfo: {
+              user: { uniqueId: "clipapi_fixture", id: "user_captioned" },
+              itemList: [
+                { id: VIDEO_ID, desc: "listed", createTime: 1711972800, video: { duration: 8 } },
+              ],
+            },
+          },
+        },
+      })}</script>`);
+    },
+  }).listCreatorVideos({
+    platform: "tiktok",
+    handle: "clipapi_fixture",
+    limit: 15,
+  });
+  assert.equal(listed.ok, true);
+  if (listed.ok) {
+    assert.equal(listed.page.videos.length, 1);
+    assert.equal(listed.page.videos[0]?.videoId, VIDEO_ID);
+  }
+
+  const empty = await createLiveTikTokAdapter({
+    fetch: async () =>
+      textResponse(`<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__">${JSON.stringify({
+        __DEFAULT_SCOPE__: {
+          "webapp.user-detail": {
+            statusCode: 0,
+            userInfo: {
+              user: { uniqueId: "nasa", id: "1" },
+              itemList: [],
+            },
+          },
+        },
+      })}</script>`),
+  }).listCreatorVideos({ platform: "tiktok", handle: "nasa", limit: 15 });
+  assert.equal(empty.ok, true);
+  if (empty.ok) {
+    assert.equal(empty.page.videos.length, 0);
+  }
+
+  const missing = await createLiveTikTokAdapter({
+    fetch: async () =>
+      textResponse(`<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__">${JSON.stringify({
+        __DEFAULT_SCOPE__: {
+          "webapp.user-detail": { statusCode: 10221, statusMsg: "user banned" },
+        },
+      })}</script>`),
+  }).listCreatorVideos({
+    platform: "tiktok",
+    handle: "missing_handle",
+    limit: 15,
+  });
+  assert.equal(missing.ok, false);
+  if (!missing.ok) {
+    assert.equal(missing.code, "not_found");
+  }
 });
 
 test("reels requests and off-platform URLs are unsupported_platform", async () => {

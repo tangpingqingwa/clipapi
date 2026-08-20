@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
   isAllowedSubtitleUrl,
   parseSubtitleBody,
+  parseTikTokCreatorPage,
   parseTikTokVideoPage,
 } from "../src/adapters/tiktok/parse.js";
 
@@ -201,6 +202,74 @@ test("claInfo.captionInfos is accepted when subtitleInfos is missing", () => {
   if (parsed.ok) {
     assert.equal(parsed.source, "platform_caption");
     assert.equal(parsed.subtitleUrl?.endsWith("captioned.vtt"), true);
+  }
+});
+
+test("creator profile HTML with itemList yields those videos only", () => {
+  const page = `<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__">${JSON.stringify({
+    __DEFAULT_SCOPE__: {
+      "webapp.user-detail": {
+        statusCode: 0,
+        userInfo: {
+          user: { uniqueId: "clipapi_fixture", id: "user_captioned" },
+          itemList: [
+            {
+              id: VIDEO_ID,
+              desc: "Recorded caption fixture.",
+              createTime: 1711972800,
+              video: { duration: 8.4, subtitleInfos: [{ url: "https://v16-webapp-prime.tiktok.com/captions/captioned.vtt" }] },
+            },
+          ],
+        },
+      },
+    },
+  })}</script>`;
+  const parsed = parseTikTokCreatorPage(page, "clipapi_fixture", undefined, 15);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.page.handle, "clipapi_fixture");
+    assert.equal(parsed.page.videos.length, 1);
+    assert.equal(parsed.page.videos[0]?.videoId, VIDEO_ID);
+    assert.equal(parsed.page.videos[0]?.hasCaptions, true);
+    assert.equal(parsed.page.nextCursor, null);
+  }
+});
+
+test("creator profile with empty itemList is an empty page, not invented uploads", () => {
+  const page = `<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__">${JSON.stringify({
+    __DEFAULT_SCOPE__: {
+      "webapp.user-detail": {
+        statusCode: 0,
+        userInfo: {
+          user: { uniqueId: "nasa", id: "7664638705177150477" },
+          stats: { videoCount: 31 },
+          itemList: [],
+        },
+      },
+    },
+  })}</script>`;
+  const parsed = parseTikTokCreatorPage(page, "nasa", undefined, 15);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.page.handle, "nasa");
+    assert.equal(parsed.page.videos.length, 0);
+    assert.equal(parsed.page.nextCursor, null);
+  }
+});
+
+test("unknown creator status is not_found", () => {
+  const page = `<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__">${JSON.stringify({
+    __DEFAULT_SCOPE__: {
+      "webapp.user-detail": {
+        statusCode: 10221,
+        statusMsg: "user banned",
+      },
+    },
+  })}</script>`;
+  const parsed = parseTikTokCreatorPage(page, "missing_handle");
+  assert.equal(parsed.ok, false);
+  if (!parsed.ok) {
+    assert.equal(parsed.code, "not_found");
   }
 });
 

@@ -4,7 +4,12 @@ import type {
   CreatorListResult,
   TranscriptAdapter,
 } from "../types.js";
-import { isAllowedSubtitleUrl, parseSubtitleBody, parseTikTokVideoPage } from "./parse.js";
+import {
+  isAllowedSubtitleUrl,
+  parseSubtitleBody,
+  parseTikTokCreatorPage,
+  parseTikTokVideoPage,
+} from "./parse.js";
 
 /** BUILD §12: 8s upstream budget on the live path. */
 export const LIVE_FETCH_TIMEOUT_MS = 8000;
@@ -36,8 +41,8 @@ type FetchTextResult =
   | { ok: false; code: AdapterFailureCode };
 
 /**
- * Public TikTok HTML → Transcript. Never throws; failures are AdapterResult.
- * Creator listing is not implemented on the live path in this PR.
+ * Public TikTok HTML → Transcript / creator page. Never throws; failures
+ * are AdapterResult. Never invents caption lines or upload rows.
  */
 export function createLiveTikTokAdapter(
   options: LiveTikTokAdapterOptions = {},
@@ -102,8 +107,29 @@ export function createLiveTikTokAdapter(
         return { ok: false, code: "upstream_blocked" };
       }
     },
-    async listCreatorVideos(): Promise<CreatorListResult> {
-      return { ok: false, code: "upstream_blocked" };
+    async listCreatorVideos(request): Promise<CreatorListResult> {
+      try {
+        if (request.platform !== "tiktok") {
+          return { ok: false, code: "unsupported_platform" };
+        }
+        const handle = request.handle.trim().replace(/^@+/, "");
+        if (handle === "" || !/^[A-Za-z0-9._]+$/.test(handle)) {
+          return { ok: false, code: "not_found" };
+        }
+        const pageUrl = `${TIKTOK_ORIGIN}/@${encodeURIComponent(handle)}`;
+        const page = await fetchText(fetchFn, pageUrl, userAgent, timeoutMs, "html");
+        if (!page.ok) {
+          return { ok: false, code: page.code };
+        }
+        return parseTikTokCreatorPage(
+          page.body,
+          handle,
+          request.cursor,
+          request.limit,
+        );
+      } catch {
+        return { ok: false, code: "upstream_blocked" };
+      }
     },
   };
 }
