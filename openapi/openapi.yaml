@@ -40,6 +40,40 @@ paths:
                 $ref: "#/components/schemas/MeEnvelope"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /v1/billing/checkout:
+    post:
+      operationId: createCheckout
+      summary: Start Stripe Checkout for the monthly $5 plan
+      description: >
+        0 credits. Returns a Checkout URL for the monthly plan (1,000 credits
+        at $5). Without a configured Stripe client the server fails closed and
+        does not call Stripe. Credits are granted only by the signed webhook.
+      responses:
+        "200":
+          description: Checkout session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/Internal"
+  /v1/billing/webhook:
+    post:
+      operationId: stripeWebhook
+      summary: Apply a signed Stripe event
+      security: []
+      description: >
+        Stripe-signed JSON. checkout.session.completed at $5 (500 cents)
+        adds 1,000 credits and leaves unused free credits in place.
+        invoice.payment_failed locks the key to free remaining 0.
+        Invalid signatures return 400. Not bearer-auth.
+      responses:
+        "200":
+          description: Event applied or replayed
+        "400":
+          description: Invalid signature or event
   /v1/transcript:
     get:
       operationId: getTranscript
@@ -384,6 +418,36 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/MeData"
+        meta:
+          $ref: "#/components/schemas/SuccessMeta"
+    CheckoutData:
+      type: object
+      additionalProperties: false
+      required: [url, sessionId, plan, amountCents, currency, credits]
+      properties:
+        url:
+          type: string
+        sessionId:
+          type: string
+        plan:
+          type: string
+          const: monthly
+        amountCents:
+          type: integer
+          const: 500
+        currency:
+          type: string
+          const: usd
+        credits:
+          type: integer
+          const: 1000
+    CheckoutEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/CheckoutData"
         meta:
           $ref: "#/components/schemas/SuccessMeta"
     CreatorVideo:

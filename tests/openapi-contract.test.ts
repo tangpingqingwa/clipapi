@@ -77,6 +77,10 @@ test("openapi.yaml documents transcript, creators, and every SPEC error code", (
   assert.match(spec, /operationId: getTranscript/);
   assert.match(spec, /\/v1\/creators\/\{handle\}\/latest/);
   assert.match(spec, /\/v1\/creators\/\{handle\}\/videos/);
+  assert.match(spec, /\/v1\/billing\/checkout/);
+  assert.match(spec, /\/v1\/billing\/webhook/);
+  assert.match(spec, /operationId: createCheckout/);
+  assert.match(spec, /operationId: stripeWebhook/);
   assert.match(spec, /operationId: getLatestVideos/);
   assert.match(spec, /operationId: listCreatorVideos/);
   for (const code of ERROR_CODES) {

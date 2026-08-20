@@ -1,5 +1,6 @@
 const DEFAULT_PORT = 3000;
 const DEFAULT_DATABASE_PATH = "./data/clipapi.sqlite";
+const DEFAULT_PUBLIC_BASE_URL = "http://localhost:3000";
 
 export type AppConfig = {
   port: number;
@@ -8,6 +9,9 @@ export type AppConfig = {
   nodeEnv: string;
   fixtureOnly: boolean;
   liveTikTok: boolean;
+  publicBaseUrl: string;
+  stripeSecret: string | undefined;
+  stripeWebhookSecret: string | undefined;
 };
 
 /** BUILD env flags are `"1"` to enable; anything else is off. */
@@ -24,6 +28,24 @@ export function shouldUseLiveTikTok(env: NodeJS.ProcessEnv = process.env): boole
     return false;
   }
   return isEnvFlagEnabled(env.CLIPAPI_LIVE);
+}
+
+export function parsePublicBaseUrl(
+  value = process.env.PUBLIC_BASE_URL,
+): string {
+  if (value === undefined || value === "") {
+    return DEFAULT_PUBLIC_BASE_URL;
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`PUBLIC_BASE_URL must be an absolute URL, got ${JSON.stringify(value)}`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`PUBLIC_BASE_URL must be http(s), got ${JSON.stringify(value)}`);
+  }
+  return url.origin;
 }
 
 export function parseListenPort(value = process.env.PORT): number {
@@ -45,6 +67,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   const bootstrapKey = env.CLIPAPI_BOOTSTRAP_KEY;
   const fixtureOnly = isEnvFlagEnabled(env.CLIPAPI_FIXTURE_ONLY);
+  const stripeSecret = env.STRIPE_SECRET;
+  const stripeWebhookSecret = env.STRIPE_WEBHOOK_SECRET;
   return {
     port: parseListenPort(env.PORT),
     databasePath:
@@ -56,5 +80,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     nodeEnv,
     fixtureOnly,
     liveTikTok: shouldUseLiveTikTok(env),
+    publicBaseUrl: parsePublicBaseUrl(env.PUBLIC_BASE_URL),
+    stripeSecret:
+      stripeSecret !== undefined && stripeSecret !== "" ? stripeSecret : undefined,
+    stripeWebhookSecret:
+      stripeWebhookSecret !== undefined && stripeWebhookSecret !== ""
+        ? stripeWebhookSecret
+        : undefined,
   };
 }

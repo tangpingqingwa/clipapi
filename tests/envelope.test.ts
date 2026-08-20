@@ -48,6 +48,9 @@ test("loadConfig requires CLIPAPI_DATABASE in production", () => {
   assert.equal(config.bootstrapKey, "ck_test_dev");
   assert.equal(config.fixtureOnly, false);
   assert.equal(config.liveTikTok, false);
+  assert.equal(config.publicBaseUrl, "http://localhost:3000");
+  assert.equal(config.stripeSecret, undefined);
+  assert.equal(config.stripeWebhookSecret, undefined);
 
   const live = loadConfig({
     CLIPAPI_DATABASE: "/tmp/clipapi.sqlite",
@@ -62,6 +65,15 @@ test("loadConfig requires CLIPAPI_DATABASE in production", () => {
   });
   assert.equal(ci.fixtureOnly, true);
   assert.equal(ci.liveTikTok, false);
+
+  const billed = loadConfig({
+    STRIPE_SECRET: "sk_test_not_used",
+    STRIPE_WEBHOOK_SECRET: "whsec_dev",
+    PUBLIC_BASE_URL: "https://api.clipapi.dev/",
+  });
+  assert.equal(billed.stripeSecret, "sk_test_not_used");
+  assert.equal(billed.stripeWebhookSecret, "whsec_dev");
+  assert.equal(billed.publicBaseUrl, "https://api.clipapi.dev");
 });
 
 test("createKey stores a hash and lookupKey finds the row", () => {

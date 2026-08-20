@@ -48,7 +48,9 @@ for f in \
   tests/fixtures/html/no_caption.html \
   tests/fixtures/html/deleted.html \
   tests/fixtures/html/blocked.html \
-  tests/fixtures/html/captioned.vtt
+  tests/fixtures/html/captioned.vtt \
+  tests/fixtures/stripe/checkout.session.completed.json \
+  tests/fixtures/stripe/invoice.payment_failed.json
 do
   [[ -f "$f" ]] || fail "missing $f"
   [[ -s "$f" ]] || fail "empty $f"
@@ -59,6 +61,10 @@ grep -q '/v1/creators/{handle}/latest' openapi/openapi.yaml \
   || fail "openapi.yaml missing GET /v1/creators/{handle}/latest"
 grep -q '/v1/creators/{handle}/videos' openapi/openapi.yaml \
   || fail "openapi.yaml missing GET /v1/creators/{handle}/videos"
+grep -q '/v1/billing/checkout' openapi/openapi.yaml \
+  || fail "openapi.yaml missing POST /v1/billing/checkout"
+grep -q '/v1/billing/webhook' openapi/openapi.yaml \
+  || fail "openapi.yaml missing POST /v1/billing/webhook"
 grep -q 'no_transcript' openapi/openapi.yaml \
   || fail "openapi.yaml missing no_transcript"
 
@@ -73,6 +79,32 @@ if grep -q 'search_clips' src/mcp/tools.ts; then
 fi
 if grep -R --include='*.ts' -E "from ['\"]stripe['\"]|STRIPE_" src/mcp >/dev/null 2>&1; then
   fail "src/mcp must not import Stripe (PR 7)"
+fi
+
+echo "== stripe monthly checkout is offline =="
+[[ -f src/billing/stripe.ts ]] || fail "missing src/billing/stripe.ts"
+[[ -f src/http/routes/billing.ts ]] || fail "missing src/http/routes/billing.ts"
+[[ -f src/migrations/002_stripe.sql ]] || fail "missing src/migrations/002_stripe.sql"
+[[ -f tests/stripe.test.ts ]] || fail "missing tests/stripe.test.ts"
+grep -q 'MONTHLY_PRICE_CENTS' src/billing/stripe.ts \
+  || fail "src/billing/stripe.ts missing monthly $5 price"
+grep -q 'MONTHLY_CREDITS' src/billing/stripe.ts \
+  || fail "src/billing/stripe.ts missing 1000 monthly credits"
+grep -q 'checkout.session.completed' tests/stripe.test.ts \
+  || fail "stripe tests must apply checkout.session.completed fixture"
+grep -q 'createFixtureStripe\|createStripeClient' tests/stripe.test.ts \
+  || fail "stripe tests must use the fail-closed / fixture client"
+if grep -E '"stripe"' package.json package-lock.json >/dev/null 2>&1; then
+  fail "do not add the live stripe SDK (CI stays offline)"
+fi
+if grep -R --include='*.ts' -E "from ['\"]stripe['\"]" src tests >/dev/null 2>&1; then
+  fail "must not import the stripe package"
+fi
+if grep -R --include='*.ts' -E 'https?://api\.stripe\.com|https?://checkout\.stripe\.com' src/billing src/http/routes/billing.ts >/dev/null 2>&1; then
+  fail "billing must not call live Stripe hosts"
+fi
+if grep -Eqi 'STRIPE_(SECRET|SECRET_KEY|API_KEY|WEBHOOK_SECRET)=' .github/workflows/ci.yml; then
+  fail "CI must not set live Stripe secrets"
 fi
 if grep -R --include='*.ts' -E 'fetch\s*\(|https?://www\.tiktok\.com/api/' src/mcp >/dev/null 2>&1; then
   fail "src/mcp must not call live TikTok"
@@ -118,6 +150,7 @@ if [[ -f package.json ]]; then
   # Quoted so bash 3.2 does not eat **; Node 22's test runner expands the glob.
   # Fixture adapter only — never hit live TikTok. CLIPAPI_FIXTURE_ONLY wins over CLIPAPI_LIVE.
   unset CLIPAPI_LIVE || true
+  unset STRIPE_SECRET STRIPE_WEBHOOK_SECRET STRIPE_SECRET_KEY STRIPE_API_KEY || true
   export CLIPAPI_FIXTURE_ONLY=1
   [[ "${CLIPAPI_LIVE:-}" != "1" ]] || fail "CLIPAPI_LIVE must stay unset in test.sh"
   test_log="$(mktemp)"

@@ -169,6 +169,8 @@ Last ~15 public uploads. For DailyBrief / monitors. Cache 5–15 min. Do not pro
 
 - `GET /v1/me` — key, plan, credits remaining, rpm
 - `GET /v1/usage?from&to` — daily buckets
+- `POST /v1/billing/checkout` — Stripe Checkout session for the monthly $5 / 1,000-credit plan (bearer). Live Stripe is optional; without secrets the handler fails closed and does not call Stripe.
+- `POST /v1/billing/webhook` — Stripe-signed events. `checkout.session.completed` at $5 adds 1,000 credits (the unused free 100 remains). `invoice.payment_failed` locks the key to free remaining = 0. Not bearer-auth.
 - `GET /healthz`
 
 ---
