@@ -214,6 +214,8 @@ async function doFetch(
     headers: {
       "User-Agent": userAgent,
       Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      Referer: "https://www.tiktok.com/",
     },
     signal: AbortSignal.timeout(timeoutMs),
   });

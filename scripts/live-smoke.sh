@@ -27,6 +27,7 @@ mkdir -p "$RAW_DIR"
 
 # Public videos that still SSR-render. First 200-with-cues wins.
 # Override with LIVE_TRANSCRIPT_URL / LIVE_TRANSCRIPT_VIDEO_ID for a single URL.
+# Do not invent cues: empty caption arrays stay 422 no_transcript (PASS-ERROR).
 TRANSCRIPT_URL="${LIVE_TRANSCRIPT_URL:-}"
 TRANSCRIPT_VIDEO_ID="${LIVE_TRANSCRIPT_VIDEO_ID:-}"
 TRANSCRIPT_CANDIDATES=(
@@ -36,6 +37,7 @@ TRANSCRIPT_CANDIDATES=(
   "https://www.tiktok.com/@tiktok_australia/video/6927466633946598658"
   "https://www.tiktok.com/@rosssmith/video/7011618699945856262"
 )
+CANDIDATE_LOG=()
 # Known-deleted / never-existed numeric id → not_found (or no_transcript / bad-url).
 ERROR_VIDEO_ID="${LIVE_ERROR_VIDEO_ID:-1}"
 BAD_URL="${LIVE_BAD_URL:-https://www.youtube.com/watch?v=dQw4w9WgXcQ}"
@@ -261,6 +263,7 @@ for cand in "${CANDIDATES[@]}"; do
   T_REQ="$(json_get "$RAW_DIR/transcript.body" meta.requestId)"
   T_PICKED="$cand"
   expect_id="${TRANSCRIPT_VIDEO_ID:-$(video_id_from_url "$cand")}"
+  CANDIDATE_LOG+=("http=$T_CODE code=${T_ERR:-ok} cues=$T_CUES credits=${T_CHARGED:-?} id=${T_VID:-$expect_id} $cand")
   if [[ "$T_CODE" == "200" && "$T_CUES" -ge 1 ]]; then
     TRANSCRIPT_URL="$cand"
     TRANSCRIPT_VIDEO_ID="$expect_id"
@@ -449,6 +452,37 @@ mkdir -p "$(dirname "$RESULTS_MD")"
     echo "- Stripe: \`STRIPE_SECRET\` was set"
   else
     echo "- Stripe: \`STRIPE_SECRET\` unset → BLOCKED-SECRET"
+  fi
+  echo
+  echo "## Transcript candidates tried"
+  echo
+  echo "First 200 with ≥1 real cue wins. Empty caption arrays are 422 \`no_transcript\`, never invented 200 cues."
+  echo
+  if [[ ${#CANDIDATE_LOG[@]} -eq 0 ]]; then
+    echo "- (none)"
+  else
+    for line in "${CANDIDATE_LOG[@]}"; do
+      echo "- \`$line\`"
+    done
+  fi
+  echo
+  echo "## Egress"
+  echo
+  transcript_verdict=""
+  i=0
+  while [[ $i -lt ${#FLOW_NAMES[@]} ]]; do
+    if [[ "${FLOW_NAMES[$i]}" == "transcript" ]]; then
+      transcript_verdict="${FLOW_VERDICTS[$i]}"
+      break
+    fi
+    i=$((i + 1))
+  done
+  if [[ "$transcript_verdict" == "PASS" ]]; then
+    echo "Happy-path transcript PASSed from this machine (200, ≥1 cue, 1 credit)."
+  else
+    echo "No captioned public TikTok was available from this egress. Live SSR still returns"
+    echo "\`claInfo.captionInfos: []\` / \`subtitleInfos: []\` (\`noCaptionReason: 3\`) on every"
+    echo "candidate. Honest result is PASS-ERROR \`no_transcript\` (422, 0 credits) — not a fake 200."
   fi
   echo
   echo "FAIL means a product bug (crash, invented cues, wrong envelope)."

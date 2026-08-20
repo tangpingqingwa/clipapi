@@ -62,6 +62,14 @@ test("no-caption HTML is no_transcript with zero cues", () => {
   }
 });
 
+test("live SSR that strips captionInfos/subtitleInfos is no_transcript, not invented cues", () => {
+  const parsed = parseTikTokVideoPage(html("live_stripped.html"), "6718335390845095173");
+  assert.equal(parsed.ok, false);
+  if (!parsed.ok) {
+    assert.equal(parsed.code, "no_transcript");
+  }
+});
+
 test("deleted HTML is not_found", () => {
   const parsed = parseTikTokVideoPage(html("deleted.html"), DELETED_ID);
   assert.equal(parsed.ok, false);
