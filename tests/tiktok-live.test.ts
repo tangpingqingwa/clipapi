@@ -104,6 +104,8 @@ test("live adapter parses captioned HTML+VTT via injected fetch, never the netwo
     calls.push(url);
     const headers = jsonHeaders(init);
     assert.equal(headers.get("user-agent"), LIVE_USER_AGENT);
+    assert.equal(headers.get("accept-language"), "en-US,en;q=0.9");
+    assert.equal(headers.get("referer"), "https://www.tiktok.com/");
     assert.equal(init?.signal instanceof AbortSignal, true);
     if (url.includes("/video/")) {
       return textResponse(snippet("captioned.html"), 200, url);
@@ -232,6 +234,25 @@ test("404 page is not_found; empty subtitle body is no_transcript with 0 cues", 
   if (!empty.ok) {
     assert.equal(empty.code, "no_transcript");
   }
+});
+
+test("live-stripped SSR (empty captionInfos, noCaptionReason 3) is no_transcript and does not fetch a fake VTT", async () => {
+  const urls: string[] = [];
+  const result = await createLiveTikTokAdapter({
+    fetch: async (input) => {
+      urls.push(String(input));
+      return textResponse(snippet("live_stripped.html"));
+    },
+  }).fetchTranscript({
+    platform: "tiktok",
+    videoId: "6718335390845095173",
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.code, "no_transcript");
+  }
+  assert.equal(urls.length, 1);
+  assert.equal(urls.some((url) => /vtt|caption/i.test(url)), false);
 });
 
 test("no-caption and captcha snippets map to SPEC codes; live adapter never throws", async () => {

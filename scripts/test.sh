@@ -46,6 +46,7 @@ for f in \
   tests/fixtures/creators/clipapi_fixture.json \
   tests/fixtures/html/captioned.html \
   tests/fixtures/html/no_caption.html \
+  tests/fixtures/html/live_stripped.html \
   tests/fixtures/html/deleted.html \
   tests/fixtures/html/blocked.html \
   tests/fixtures/html/captioned.vtt \
@@ -114,6 +115,10 @@ echo "== live TikTok adapter is env-gated and offline-tested =="
 [[ -f src/adapters/tiktok/parse.ts ]] || fail "missing src/adapters/tiktok/parse.ts"
 [[ -f tests/tiktok-parse.test.ts ]] || fail "missing tests/tiktok-parse.test.ts"
 [[ -f tests/tiktok-live.test.ts ]] || fail "missing tests/tiktok-live.test.ts"
+grep -q 'live_stripped' tests/tiktok-parse.test.ts \
+  || fail "parse tests must cover live SSR that strips caption tracks"
+grep -q 'noCaptionReason' tests/tiktok-live.test.ts \
+  || fail "live adapter tests must cover stripped SSR no_transcript"
 grep -q 'CLIPAPI_LIVE' src/config.ts || fail "src/config.ts missing CLIPAPI_LIVE"
 grep -q 'CLIPAPI_FIXTURE_ONLY' src/config.ts || fail "src/config.ts missing CLIPAPI_FIXTURE_ONLY"
 grep -q 'createLiveTikTokAdapter' src/adapters/index.ts \
