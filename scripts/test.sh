@@ -133,6 +133,40 @@ if grep -R --include='*.ts' -E "from ['\"].*adapters/" src/mcp >/dev/null 2>&1; 
   fail "src/mcp must call core only (no adapter imports)"
 fi
 
+echo "== deploy artifacts (Dockerfile + runbook) =="
+[[ -f Dockerfile ]] || fail "missing Dockerfile"
+[[ -f .env.example ]] || fail "missing .env.example"
+[[ -f deploy/runbook.md ]] || fail "missing deploy/runbook.md"
+grep -q 'node:22' Dockerfile || fail "Dockerfile must use Node 22"
+grep -qE '^USER[[:space:]]+node$' Dockerfile || fail "Dockerfile must run as non-root USER node"
+grep -q 'PORT' Dockerfile || fail "Dockerfile must honor PORT"
+grep -q 'src/server.ts' Dockerfile || fail "Dockerfile must start src/server.ts"
+if grep -E 'CLIPAPI_LIVE[[:space:]]*=[[:space:]]*(1|true|yes|on)' Dockerfile >/dev/null; then
+  fail "Dockerfile must not enable live TikTok"
+fi
+if grep -E 'STRIPE_(SECRET|WEBHOOK_SECRET)[[:space:]]*=' Dockerfile >/dev/null; then
+  fail "Dockerfile must not bake STRIPE_* secrets"
+fi
+grep -q 'CLIPAPI_LIVE' .env.example || fail ".env.example missing CLIPAPI_LIVE"
+grep -q 'CLIPAPI_FIXTURE_ONLY' .env.example || fail ".env.example missing CLIPAPI_FIXTURE_ONLY"
+grep -q 'CLIPAPI_DATABASE' .env.example || fail ".env.example missing CLIPAPI_DATABASE"
+grep -q 'STRIPE_SECRET' .env.example || fail ".env.example missing STRIPE_SECRET"
+grep -q 'STRIPE_WEBHOOK_SECRET' .env.example || fail ".env.example missing STRIPE_WEBHOOK_SECRET"
+if grep -E '^[[:space:]]*CLIPAPI_LIVE=1[[:space:]]*$' .env.example >/dev/null; then
+  fail ".env.example must not default live TikTok on"
+fi
+if grep -E '^[[:space:]]*STRIPE_(SECRET|WEBHOOK_SECRET)=' .env.example >/dev/null; then
+  fail ".env.example must keep STRIPE_* commented"
+fi
+if grep -E '^[[:space:]]*CLIPAPI_BOOTSTRAP_KEY=ck_(live|test)_' .env.example >/dev/null; then
+  fail ".env.example must not ship a real bootstrap key"
+fi
+grep -q '/healthz' deploy/runbook.md || fail "runbook missing /healthz"
+grep -q 'CLIPAPI_LIVE=1' deploy/runbook.md || fail "runbook missing how to enable live TikTok"
+grep -q 'STRIPE_' deploy/runbook.md || fail "runbook missing how to enable Stripe"
+grep -q 'docker build' deploy/runbook.md || fail "runbook missing docker build"
+grep -q 'docker run' deploy/runbook.md || fail "runbook missing docker run"
+
 if [[ -f package.json ]]; then
   echo "== install =="
   if [[ ! -d node_modules ]]; then
