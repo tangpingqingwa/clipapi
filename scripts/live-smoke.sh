@@ -28,11 +28,16 @@ mkdir -p "$RAW_DIR"
 # Public videos that still SSR-render. First 200-with-cues wins.
 # Override with LIVE_TRANSCRIPT_URL / LIVE_TRANSCRIPT_VIDEO_ID for a single URL.
 # Do not invent cues: empty caption arrays stay 422 no_transcript (PASS-ERROR).
+# Prefer sitemap videos whose live SSR still includes captionInfos (regional CDN).
 TRANSCRIPT_URL="${LIVE_TRANSCRIPT_URL:-}"
 TRANSCRIPT_VIDEO_ID="${LIVE_TRANSCRIPT_VIDEO_ID:-}"
 TRANSCRIPT_CANDIDATES=(
+  "https://www.tiktok.com/@rosssmith/video/6989607394561035525"
+  "https://www.tiktok.com/@snickersbar/video/6989666763747233030"
+  "https://www.tiktok.com/@risethriverepeat/video/6966742837748649222"
+  "https://www.tiktok.com/@rosssmith/video/7009404024818519302"
+  "https://www.tiktok.com/@elfyeah/video/7010139675390151942"
   "https://www.tiktok.com/@scout2015/video/6718335390845095173"
-  "https://www.tiktok.com/@tiktok/video/6718335390845095173"
   "https://www.tiktok.com/@dearmebeauty/video/6893431881816149250"
   "https://www.tiktok.com/@tiktok_australia/video/6927466633946598658"
   "https://www.tiktok.com/@rosssmith/video/7011618699945856262"

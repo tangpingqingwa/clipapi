@@ -117,6 +117,8 @@ echo "== live TikTok adapter is env-gated and offline-tested =="
 [[ -f tests/tiktok-live.test.ts ]] || fail "missing tests/tiktok-live.test.ts"
 grep -q 'live_stripped' tests/tiktok-parse.test.ts \
   || fail "parse tests must cover live SSR that strips caption tracks"
+grep -q 'tiktokcdn-us' tests/tiktok-parse.test.ts \
+  || fail "parse tests must allow regional tiktokcdn-us caption hosts"
 grep -q 'noCaptionReason' tests/tiktok-live.test.ts \
   || fail "live adapter tests must cover stripped SSR no_transcript"
 grep -q 'CLIPAPI_LIVE' src/config.ts || fail "src/config.ts missing CLIPAPI_LIVE"
