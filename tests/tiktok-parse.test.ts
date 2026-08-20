@@ -138,6 +138,16 @@ test("parseSubtitleBody reads checked-in VTT without inventing lines", () => {
   ]);
 });
 
+test("parseSubtitleBody reads live-style hour timestamps without inventing lines", () => {
+  const cues = parseSubtitleBody(
+    "WEBVTT\n\n\n00:00:05.833 --> 00:00:06.566\nwhat the heck\n\n00:00:08.633 --> 00:00:10.646\nhey what is your deal man\n",
+  );
+  assert.deepEqual(cues, [
+    { text: "what the heck", start: 5.833, duration: 0.733 },
+    { text: "hey what is your deal man", start: 8.633, duration: 2.013 },
+  ]);
+});
+
 test("parseSubtitleBody reads checked-in JSON caption milliseconds as seconds", () => {
   const cues = parseSubtitleBody(html("captioned-subs.json"));
   assert.deepEqual(cues, [
@@ -290,6 +300,59 @@ test("isAllowedSubtitleUrl accepts TikTok CDN hosts over https only", () => {
     isAllowedSubtitleUrl(new URL("https://www.tiktok.com/aweme/v1/caption")),
     true,
   );
+  assert.equal(
+    isAllowedSubtitleUrl(new URL("https://v16m-webapp.tiktokcdn-us.com/captions/a.vtt")),
+    true,
+  );
+  assert.equal(
+    isAllowedSubtitleUrl(new URL("https://v16-webapp.tiktokcdn-eu.com/captions/a.vtt")),
+    true,
+  );
   assert.equal(isAllowedSubtitleUrl(new URL("http://www.tiktok.com/x.vtt")), false);
   assert.equal(isAllowedSubtitleUrl(new URL("https://evil.example/x.vtt")), false);
+  assert.equal(
+    isAllowedSubtitleUrl(new URL("https://evil.tiktokcdn-us.com.example/x.vtt")),
+    false,
+  );
+});
+
+test("claInfo urlList can supply an allowed host when url is off-CDN", () => {
+  const page = `<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__">${JSON.stringify({
+    __DEFAULT_SCOPE__: {
+      "webapp.video-detail": {
+        statusCode: 0,
+        itemInfo: {
+          itemStruct: {
+            id: VIDEO_ID,
+            desc: "urlList fallback",
+            createTime: 1711972800,
+            video: {
+              duration: 8.4,
+              claInfo: {
+                captionInfos: [
+                  {
+                    language: "eng-US",
+                    url: "https://evil.example/steal.vtt",
+                    urlList: [
+                      "https://evil.example/steal.vtt",
+                      "https://www.tiktok.com/aweme/v1/play/?format=webvtt",
+                    ],
+                    isAutoGen: true,
+                  },
+                ],
+              },
+            },
+            author: { uniqueId: "clipapi_fixture", id: "user_captioned" },
+            music: { title: "Original sound" },
+          },
+        },
+      },
+    },
+  })}</script>`;
+  const parsed = parseTikTokVideoPage(page, VIDEO_ID);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.source, "platform_asr");
+    assert.equal(parsed.subtitleUrl?.startsWith("https://www.tiktok.com/aweme/"), true);
+  }
 });

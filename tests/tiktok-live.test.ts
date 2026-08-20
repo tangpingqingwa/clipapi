@@ -97,6 +97,32 @@ test("createAppAdapter stays on fixtures by default and when CI sets FIXTURE_ONL
   }
 });
 
+test("live adapter fetches caption tracks from regional tiktokcdn-us hosts", async () => {
+  const page = snippet("captioned.html").replaceAll(
+    "https://v16-webapp-prime.tiktok.com/captions/captioned.vtt",
+    "https://v16m-webapp.tiktokcdn-us.com/captions/captioned.vtt",
+  );
+  const urls: string[] = [];
+  const result = await createLiveTikTokAdapter({
+    fetch: async (input) => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes("/video/")) {
+        return textResponse(page, 200, url);
+      }
+      if (url.includes("tiktokcdn-us.com") && url.includes("captioned.vtt")) {
+        return textResponse(snippet("captioned.vtt"), 200, url);
+      }
+      throw new Error(`unexpected url ${url}`);
+    },
+  }).fetchTranscript({ platform: "tiktok", videoId: VIDEO_ID });
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.transcript.transcript.length, 2);
+  }
+  assert.equal(urls.some((url) => url.includes("tiktokcdn-us.com")), true);
+});
+
 test("live adapter parses captioned HTML+VTT via injected fetch, never the network", async () => {
   const calls: string[] = [];
   const fetchFn: FetchLike = async (input, init) => {

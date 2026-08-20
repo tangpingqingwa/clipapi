@@ -121,7 +121,10 @@ export function isAllowedSubtitleUrl(url: URL): boolean {
   return (
     host === "www.tiktok.com" ||
     host.endsWith(".tiktok.com") ||
+    host === "tiktokcdn.com" ||
     host.endsWith(".tiktokcdn.com") ||
+    // Live caption tracks use regional CDNs (v16m-webapp.tiktokcdn-us.com).
+    /^(?:[a-z0-9-]+\.)*tiktokcdn-[a-z]{2,}\.com$/.test(host) ||
     host.endsWith(".tiktokv.com") ||
     host.endsWith(".ibyteimg.com")
   );
@@ -425,8 +428,8 @@ function collectSubtitleEntries(raw: unknown, out: SubtitleRef[]): void {
     if (rec === null) {
       continue;
     }
-    const url = readString(rec, "url", "Url") ?? firstStringInList(rec.urlList);
-    if (url === undefined || url === "") {
+    const url = firstAllowedSubtitleUrl(rec);
+    if (url === undefined) {
       continue;
     }
     const languageCode =
@@ -442,12 +445,27 @@ function collectSubtitleEntries(raw: unknown, out: SubtitleRef[]): void {
   }
 }
 
-function firstStringInList(value: unknown): string | undefined {
-  if (!Array.isArray(value)) {
-    return undefined;
+function firstAllowedSubtitleUrl(rec: Record<string, unknown>): string | undefined {
+  const candidates: unknown[] = [rec.url, rec.Url];
+  if (Array.isArray(rec.urlList)) {
+    candidates.push(...rec.urlList);
   }
-  const first = value.find((item) => typeof item === "string" && item !== "");
-  return typeof first === "string" ? first : undefined;
+  if (Array.isArray(rec.UrlList)) {
+    candidates.push(...rec.UrlList);
+  }
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string" || candidate === "") {
+      continue;
+    }
+    try {
+      if (isAllowedSubtitleUrl(new URL(candidate))) {
+        return candidate;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
 }
 
 function pickSubtitle(infos: SubtitleRef[], lang?: string): SubtitleRef | undefined {
