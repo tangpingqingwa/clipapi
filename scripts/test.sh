@@ -122,6 +122,14 @@ grep -q 'createLiveTikTokAdapter' src/adapters/index.ts \
 if [[ -d tests/live ]]; then
   echo "note: tests/live/ is present and skipped (offline gate)"
 fi
+if [[ -f scripts/live-smoke.sh ]]; then
+  if grep -R -E 'live-smoke\.sh|scripts/live-smoke' .github/workflows >/dev/null 2>&1; then
+    fail "live-smoke.sh must not be called from GitHub Actions"
+  fi
+  if grep -R -E 'CLIPAPI_LIVE[[:space:]]*=[[:space:]]*1' .github/workflows >/dev/null 2>&1; then
+    fail "CI must not set CLIPAPI_LIVE=1"
+  fi
+fi
 
 echo "== HTTP/MCP do not import adapters/tiktok =="
 for dir in src/http src/mcp; do
