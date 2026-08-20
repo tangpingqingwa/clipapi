@@ -6,7 +6,25 @@ export type AppConfig = {
   databasePath: string;
   bootstrapKey: string | undefined;
   nodeEnv: string;
+  fixtureOnly: boolean;
+  liveTikTok: boolean;
 };
+
+/** BUILD env flags are `"1"` to enable; anything else is off. */
+export function isEnvFlagEnabled(value: string | undefined): boolean {
+  return value === "1";
+}
+
+/**
+ * Live public-TikTok adapter. CLIPAPI_FIXTURE_ONLY=1 always wins so CI/test.sh
+ * stay offline even if CLIPAPI_LIVE leaks into the environment.
+ */
+export function shouldUseLiveTikTok(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (isEnvFlagEnabled(env.CLIPAPI_FIXTURE_ONLY)) {
+    return false;
+  }
+  return isEnvFlagEnabled(env.CLIPAPI_LIVE);
+}
 
 export function parseListenPort(value = process.env.PORT): number {
   if (value === undefined || value === "") {
@@ -26,6 +44,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("CLIPAPI_DATABASE is required in production");
   }
   const bootstrapKey = env.CLIPAPI_BOOTSTRAP_KEY;
+  const fixtureOnly = isEnvFlagEnabled(env.CLIPAPI_FIXTURE_ONLY);
   return {
     port: parseListenPort(env.PORT),
     databasePath:
@@ -35,5 +54,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     bootstrapKey:
       bootstrapKey !== undefined && bootstrapKey !== "" ? bootstrapKey : undefined,
     nodeEnv,
+    fixtureOnly,
+    liveTikTok: shouldUseLiveTikTok(env),
   };
 }
